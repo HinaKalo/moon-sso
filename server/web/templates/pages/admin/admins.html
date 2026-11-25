@@ -1,0 +1,47 @@
+{{define "content"}}
+<div class="page-head">
+  <h1>管理员</h1>
+  <p class="muted">控制台管理员是独立账号，不是 SSO 用户，不能登录 SSO 或任何接入应用。每位管理员都必须绑定身份验证器。</p>
+</div>
+{{template "alerts" .}}
+{{with .Data.TempPassword}}<div class="secret-once gap-top"><span id="tmp-pw">{{.}}</span><button class="btn btn-ghost btn-sm" type="button" data-copy="tmp-pw">复制</button></div>{{end}}
+<section class="card gap-top">
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>账号</th><th>状态</th><th>两步验证</th><th>最近登录</th><th>创建时间</th><th></th></tr></thead>
+    <tbody>
+    {{$csrf := .CSRF}}{{$me := .Admin}}
+    {{range .Data.Admins}}
+      <tr>
+        <td><strong>{{.Name}}</strong><br><span class="mono small muted">@{{.Username}}</span>{{if eq .ID $me.ID}} <span class="badge badge-primary">你</span>{{end}}</td>
+        <td>{{template "status_badge" .Status}}{{if .MustChangePassword}} <span class="badge badge-warn">待改密码</span>{{end}}</td>
+        <td>{{if .HasTOTP}}<span class="badge badge-ok">已绑定</span>{{else}}<span class="badge badge-warn">首次登录时绑定</span>{{end}}</td>
+        <td class="small">{{fmtTime .LastLoginAt}}{{with .LastLoginIP}}<br><span class="mono muted">{{.}}</span>{{end}}</td>
+        <td class="small nowrap">{{fmtTime .CreatedAt}}</td>
+        <td>
+          <div class="actions">
+          {{if ne .ID $me.ID}}
+            <form method="post" action="/admins/{{.ID}}" hx-confirm="重置后该管理员需要用临时密码重新登录，并重新绑定身份验证器。确定吗？"><input type="hidden" name="_csrf" value="{{$csrf}}"><button class="btn btn-ghost btn-sm" name="action" value="reset">重置</button></form>
+            {{if eq .Status 1}}<form method="post" action="/admins/{{.ID}}" hx-confirm="停用后该管理员立即退出控制台。确定吗？"><input type="hidden" name="_csrf" value="{{$csrf}}"><button class="btn btn-danger btn-sm" name="action" value="disable">停用</button></form>
+            {{else}}<form method="post" action="/admins/{{.ID}}"><input type="hidden" name="_csrf" value="{{$csrf}}"><button class="btn btn-ghost btn-sm" name="action" value="enable">启用</button></form>{{end}}
+          {{end}}
+            <form method="post" action="/admins/{{.ID}}"><input type="hidden" name="_csrf" value="{{$csrf}}"><button class="btn btn-ghost btn-sm" name="action" value="revoke_sessions">结束会话</button></form>
+          </div>
+        </td>
+      </tr>
+    {{end}}
+    </tbody>
+  </table>
+  </div>
+</section>
+<section class="card narrow-left">
+  <h2>添加管理员</h2>
+  <form method="post" action="/admins" class="form">
+    {{template "csrf" .}}
+    <label class="field"><span>账号</span><input name="username" value="{{.Form.username}}" required minlength="3" maxlength="32" autocapitalize="none" spellcheck="false"></label>
+    <label class="field"><span>显示名称 <em>可选</em></span><input name="display_name" value="{{.Form.display_name}}" maxlength="64"></label>
+    <p class="small muted">系统会生成临时密码（只显示一次）。新管理员首次登录时必须修改密码并绑定身份验证器。</p>
+    <button class="btn btn-primary" type="submit">创建管理员</button>
+  </form>
+</section>
+{{end}}

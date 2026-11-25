@@ -1,0 +1,5 @@
+.secrets/
+/server/bin/
+/dist/
+*.exe
+/sdk/typescript/dist-pkg/

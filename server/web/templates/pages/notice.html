@@ -1,0 +1,7 @@
+{{define "content"}}
+<section class="card {{if .User}}narrow{{else}}auth-card{{end}}">
+  <h1>{{.Data.Heading}}</h1>
+  <p>{{.Data.Message}}</p>
+  {{with .Data.Action}}<p><a class="btn btn-primary" href="{{.}}">{{$.Data.ActionText}}</a></p>{{end}}
+</section>
+{{end}}

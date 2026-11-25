@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="zh-CN" xmlns:th="http://www.thymeleaf.org">
+<head>
+  <meta charset="UTF-8">
+  <title>个人资料 - Moon SSO 示例</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="stylesheet" th:href="@{/css/app.css}">
+  <script src="https://unpkg.com/htmx.org@2.0.4/dist/htmx.min.js" defer></script>
+</head>
+<body>
+<main>
+  <p><a th:href="@{/}">← 首页</a></p>
+  <h1>个人资料</h1>
+  <p class="ok" th:if="${message}" th:text="${message}">ok</p>
+  <p class="error" th:if="${error}" th:text="${error}">error</p>
+
+  <section th:fragment="card" id="card">
+    <img th:if="${profile.picture}" th:src="${profile.picture}" alt="头像" class="avatar">
+    <dl>
+      <dt>用户名</dt><dd th:text="${profile.preferredUsername}">name</dd>
+      <dt>昵称</dt><dd th:text="${profile.nickname}">nick</dd>
+      <dt>资料版本</dt><dd th:text="${profile.profileVersion}">1</dd>
+      <dt>两步验证</dt><dd th:text="${profile.totpEnabled} ? '已开启' : '未开启'">no</dd>
+    </dl>
+    <button hx-get="/profile/card" hx-target="#card" hx-swap="outerHTML">刷新（HTMX）</button>
+  </section>
+
+  <h2>修改昵称</h2>
+  <form th:action="@{/profile}" method="post">
+    <input type="hidden" name="version" th:value="${profile.profileVersion}">
+    <input name="displayName" th:value="${profile.nickname}" maxlength="40" required>
+    <button type="submit">保存</button>
+  </form>
+
+  <h2>头像</h2>
+  <form th:action="@{/profile/avatar}" method="post" enctype="multipart/form-data">
+    <input type="file" name="avatar" accept="image/png,image/jpeg,image/gif,image/webp" required>
+    <button type="submit">上传</button>
+  </form>
+  <form th:action="@{/profile/avatar/delete}" method="post" th:if="${profile.picture}">
+    <button type="submit">删除头像</button>
+  </form>
+
+  <h2>最近收到的事件（Webhook / 后端通道登出）</h2>
+  <p th:if="${#lists.isEmpty(events)}">暂无。</p>
+  <table th:unless="${#lists.isEmpty(events)}">
+    <tr><th>时间</th><th>类型</th><th>sub</th><th>内容</th></tr>
+    <tr th:each="e : ${events}">
+      <td th:text="${e.receivedAt}">t</td>
+      <td th:text="${e.type}">type</td>
+      <td><code th:text="${e.sub}">sub</code></td>
+      <td th:text="${e.summary}">summary</td>
+    </tr>
+  </table>
+</main>
+</body>
+</html>

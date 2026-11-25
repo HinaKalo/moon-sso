@@ -1,0 +1,17 @@
+{{define "content"}}
+<div class="page-head"><h1>审计日志</h1><p class="muted">保留 365 天。</p></div>
+<form class="toolbar" method="get" action="/audit" hx-get="/audit" hx-target="#audit-table" hx-swap="outerHTML" hx-trigger="input changed delay:400ms from:input, submit" hx-push-url="true">
+  <input name="action" value="{{.Form.action}}" placeholder="操作前缀，如 user.login" aria-label="操作">
+  <input name="target" value="{{.Form.target}}" placeholder="对象 ID（sub / client_id）" aria-label="对象">
+  <input name="actor" value="{{.Form.actor}}" placeholder="操作者：SSO 用户名，或 @管理员" aria-label="操作者">
+  <noscript><button class="btn btn-ghost" type="submit">筛选</button></noscript>
+</form>
+<section class="card">{{template "audit_table" .}}</section>
+{{end}}
+
+{{define "audit_table"}}
+<div id="audit-table">
+  {{template "audit_rows" .Data.Entries}}
+  {{with .Data.Next}}<div class="pager"><span></span><a class="btn btn-ghost btn-sm" href="/audit?action={{$.Form.action}}&target={{$.Form.target}}&actor={{$.Form.actor}}&before={{.}}">更早 →</a></div>{{end}}
+</div>
+{{end}}

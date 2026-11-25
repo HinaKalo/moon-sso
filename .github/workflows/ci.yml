@@ -1,0 +1,29 @@
+# CI：服务端与 Go SDK 的检查、安全扫描。
+# 端到端测试需要数据库 DSN（MOON_SSO_TEST_DSN），未配置时自动跳过；部署流程见 deploy/。
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  server:
+    uses: HinaKalo/moon-infra/.github/workflows/ci-go.yml@main
+    with:
+      working-directory: server
+
+  sdk-go:
+    uses: HinaKalo/moon-infra/.github/workflows/ci-go.yml@main
+    with:
+      working-directory: sdk/go
+
+  security:
+    uses: HinaKalo/moon-infra/.github/workflows/security.yml@main
+    permissions:
+      contents: read
+      security-events: write
+      actions: read

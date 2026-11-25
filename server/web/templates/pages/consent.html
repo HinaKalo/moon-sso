@@ -1,0 +1,30 @@
+{{define "content"}}
+{{$c := .Data.Client}}
+<section class="card auth-card">
+  <div class="consent-app">
+    {{if $c.LogoURI}}<img src="{{$c.LogoURI}}" alt="" referrerpolicy="no-referrer">{{else}}<span class="app-logo avatar-fallback avatar">{{initial $c.Name}}</span>{{end}}
+    <div>
+      <h1>{{$c.Name}}</h1>
+      <div class="small muted">
+        {{if $c.Verified}}<span class="badge badge-ok">已验证</span>{{else}}<span class="badge badge-warn">未验证应用</span>{{end}}
+        {{if $c.FirstParty}}<span class="badge badge-primary">官方应用</span>{{end}}
+        将跳转到 <span class="mono">{{.Data.RedirectHost}}</span>
+      </div>
+    </div>
+  </div>
+  <p>该应用请求以 <strong>{{.User.Name}}</strong>（{{.User.Username}}）的身份：</p>
+  <ul class="scopes">
+    {{range .Data.Scopes}}<li><div>{{.Description}}{{if .Sensitive}} <span class="badge badge-warn">敏感</span>{{end}}{{if .New}} <span class="badge">新</span>{{end}}</div></li>{{end}}
+  </ul>
+  {{if not $c.Verified}}<p class="warn-box">该应用尚未经过管理员审核。请确认你信任它再继续。</p>{{end}}
+  {{with $c.Description}}<p class="small muted">{{.}}</p>{{end}}
+  <form method="post" action="/oauth/consent" class="row">
+    {{template "csrf" .}}
+    <input type="hidden" name="request" value="{{.Data.Request}}">
+    <button class="btn btn-primary" type="submit" name="decision" value="approve">允许</button>
+    <button class="btn btn-ghost" type="submit" name="decision" value="deny">拒绝</button>
+  </form>
+  <p class="small muted">之后可以在「授权应用」中随时取消。{{with $c.PolicyURI}} <a href="{{.}}" rel="noopener noreferrer" target="_blank">隐私政策</a>{{end}}{{with $c.TOSURI}} · <a href="{{.}}" rel="noopener noreferrer" target="_blank">服务条款</a>{{end}}</p>
+  <p class="switch">不是你？<a href="/logout">切换账号</a></p>
+</section>
+{{end}}

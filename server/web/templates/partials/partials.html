@@ -1,0 +1,14 @@
+{{define "alerts"}}
+{{if .Flash}}<div class="alert alert-ok" role="status">{{.Flash}}</div>{{end}}
+{{if .Error}}<div class="alert alert-err" role="alert">{{.Error}}</div>{{end}}
+{{end}}
+
+{{define "csrf"}}<input type="hidden" name="_csrf" value="{{.CSRF}}">{{end}}
+
+{{define "ferr"}}{{with index .Errors .Field}}<p class="ferr" role="alert">{{.}}</p>{{end}}{{end}}
+
+{{define "avatar"}}{{$u := .User}}{{if $u.AvatarKey}}<img class="avatar avatar-{{.Size}}" src="{{avatar $u.AvatarKey}}" alt="">{{else}}<span class="avatar avatar-{{.Size}} avatar-fallback" aria-hidden="true">{{initial $u.Name}}</span>{{end}}{{end}}
+
+{{define "spinner"}}<span class="spinner htmx-indicator" aria-hidden="true"></span>{{end}}
+
+{{define "api_token_status"}}{{if eq .Status "active"}}{{if .ExpiresSoon}}<span class="badge badge-warn">即将过期</span>{{else}}<span class="badge badge-ok">有效</span>{{end}}{{else if eq .Status "rotating"}}<span class="badge badge-warn">已轮换 · 宽限期中</span>{{else if eq .Status "expired"}}<span class="badge">已过期</span>{{else}}<span class="badge badge-err">已吊销</span>{{end}}{{end}}

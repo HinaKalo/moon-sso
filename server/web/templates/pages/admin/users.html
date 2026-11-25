@@ -1,0 +1,46 @@
+{{define "content"}}
+<div class="page-head row spread">
+  <h1>用户</h1>
+  <a class="btn btn-primary" href="/users/new">创建用户</a>
+</div>
+<form class="toolbar" method="get" action="/users" hx-get="/users" hx-target="#users-table" hx-swap="outerHTML" hx-trigger="input changed delay:300ms from:input, change from:select, submit" hx-push-url="true">
+  <input type="search" name="q" value="{{.Form.q}}" placeholder="用户名 / 昵称 / sub" aria-label="搜索">
+  <select name="status" aria-label="状态">
+    <option value="">全部状态</option>
+    <option value="1" {{if eq .Form.status "1"}}selected{{end}}>正常</option>
+    <option value="2" {{if eq .Form.status "2"}}selected{{end}}>已停用</option>
+  </select>
+  <noscript><button class="btn btn-ghost" type="submit">搜索</button></noscript>
+</form>
+<section class="card">{{template "users_table" .}}</section>
+{{end}}
+
+{{define "users_table"}}
+<div id="users-table">
+  <p class="small muted">共 {{.Data.Total}} 个用户</p>
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>用户</th><th>Public sub</th><th>状态</th><th>两步验证</th><th>注册来源</th><th>注册时间</th></tr></thead>
+    <tbody>
+    {{range .Data.Users}}
+      <tr>
+        <td><a class="row" href="/users/{{.PublicSub}}">{{template "avatar" dict "User" . "Size" "sm"}}<span><strong>{{.Username}}</strong><br><span class="small muted">{{.DisplayName}}</span></span></a></td>
+        <td class="mono small">{{.PublicSub}}</td>
+        <td>{{template "status_badge" .Status}}</td>
+        <td>{{if .HasTOTP}}<span class="badge badge-ok">已开启</span>{{else}}<span class="badge">未开启</span>{{end}}</td>
+        <td class="small mono">{{.RegisteredVia}}</td>
+        <td class="small nowrap">{{fmtTime .CreatedAt}}</td>
+      </tr>
+    {{else}}
+      <tr><td colspan="6" class="muted">没有匹配的用户</td></tr>
+    {{end}}
+    </tbody>
+  </table>
+  </div>
+  <div class="pager">
+    {{if .Data.HasPrev}}<a class="btn btn-ghost btn-sm" href="/users?q={{.Form.q}}&status={{.Form.status}}&page={{add .Data.Page -1}}">上一页</a>{{else}}<span></span>{{end}}
+    <span class="small muted">第 {{.Data.Page}} 页</span>
+    {{if .Data.HasNext}}<a class="btn btn-ghost btn-sm" href="/users?q={{.Form.q}}&status={{.Form.status}}&page={{add .Data.Page 1}}">下一页</a>{{else}}<span></span>{{end}}
+  </div>
+</div>
+{{end}}

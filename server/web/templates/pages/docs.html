@@ -1,0 +1,126 @@
+{{define "content"}}
+<div class="page-head">
+  <h1>接入文档</h1>
+  <p class="muted">用 {{.Site.SiteName}} 账号登录你的应用：Web、浏览器单页应用、桌面、Android 都按同样的标准 OAuth 2.0 / OpenID Connect 接入。</p>
+</div>
+
+<section class="card">
+  <h2>1. 创建应用</h2>
+  <p>登录后在 <a href="/developer">开发者中心</a> 创建应用，选择应用类型并登记回调地址，即可拿到 <code class="mono">client_id</code>（服务端应用另有 <code class="mono">client_secret</code>）。也可以用 Initial Access Token 通过 <code class="mono">POST /oauth/register</code>（RFC 7591）或 SDK 自动注册。</p>
+  <dl class="kv">
+    <dt>Issuer</dt><dd class="mono">{{.Data.Issuer}}</dd>
+    <dt>Discovery</dt><dd class="mono"><a href="/.well-known/openid-configuration">{{.Data.Issuer}}/.well-known/openid-configuration</a></dd>
+    <dt>JWKS</dt><dd class="mono">{{.Data.Issuer}}/.well-known/jwks.json</dd>
+    <dt>OpenAPI</dt><dd class="mono"><a href="/openapi.yaml">{{.Data.Issuer}}/openapi.yaml</a></dd>
+    <dt>SDK 下载</dt><dd><a href="/sdk">{{.Data.Issuer}}/sdk</a></dd>
+  </dl>
+</section>
+
+<section class="card">
+  <h2>2. 协议要点</h2>
+  <ul>
+    <li>只支持授权码模式，所有客户端都必须使用 <strong>PKCE S256</strong>。授权响应带 <code class="mono">iss</code> 参数（RFC 9207），请同时校验 <code class="mono">state</code> 和 <code class="mono">iss</code>。</li>
+    <li>Access Token 是 JWT（ES256，<code class="mono">typ: at+jwt</code>），有效期 {{.Site.AccessTokenMinutes}} 分钟，资源服务器可以用 JWKS 在本地校验。ID Token 默认 RS256。</li>
+    <li>Refresh Token 每次使用都会轮换。同一个旧令牌在 60 秒内重复提交时，服务端返回同一个新令牌，所以多标签页、多进程同时刷新和网络重试都是安全的。超过宽限期再次使用会被判定为盗用，这一组令牌全部作废。</li>
+    <li>浏览器单页应用、桌面和移动应用建议开启 <strong>DPoP</strong>（RFC 9449）：refresh token 与设备密钥绑定，被窃取后在其他设备上无法使用。</li>
+    <li>第三方应用拿到的 <code class="mono">sub</code> 按应用区分（pairwise），以保护用户隐私。请以 <code class="mono">sub</code> 作为用户主键，不要用用户名，因为用户名可以修改。</li>
+  </ul>
+</section>
+
+<section class="card">
+  <h2>3. 选择 SDK</h2>
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>平台</th><th>安装</th><th>适用场景</th></tr></thead>
+    <tbody>
+      <tr><td>Go</td><td class="mono small">go get sso.moonl.cloud/sdk/go@latest</td><td>服务端 Web（net/http、Echo）、资源服务器、桌面/CLI</td></tr>
+      <tr><td>TypeScript</td><td class="mono small">npm i {{.Data.Issuer}}/sdk/npm/moon-sso-browser-&lt;版本&gt;.tgz</td><td>浏览器 SPA、Node / Express（BFF）、Electron</td></tr>
+      <tr><td>Android / Kotlin</td><td class="mono small">maven { url "{{.Data.Issuer}}/sdk/maven" }</td><td>Android（Custom Tabs、Keystore）、Kotlin/JVM 桌面</td></tr>
+      <tr><td>.NET</td><td class="mono small">nuget source: {{.Data.Issuer}}/sdk/nuget</td><td>WPF、WinForms、Avalonia、控制台、ASP.NET 回调校验</td></tr>
+      <tr><td>Python</td><td class="mono small">pip install {{.Data.Issuer}}/sdk/pypi/moon_sso-&lt;版本&gt;-py3-none-any.whl</td><td>FastAPI、Flask、Django、脚本</td></tr>
+      <tr><td>Java Spring</td><td class="mono small">cloud.moonl.sso:moon-sso-spring-boot-starter</td><td>Spring Boot（Security 登录、资源服务器、Webhook）</td></tr>
+    </tbody>
+  </table>
+  </div>
+</section>
+
+<section class="card">
+  <h2>4. 应用内修改资料并同步</h2>
+  <p>拿到 <code class="mono">profile:write</code> 的应用可以调用 <code class="mono">PATCH /api/v1/me</code> 修改用户名和昵称，调用 <code class="mono">PUT /api/v1/me/avatar</code> 上传头像；拿到 <code class="mono">password:write</code> 的应用可以调用 <code class="mono">POST /api/v1/me/password</code> 修改密码（需要当前密码）。修改后会通过以下方式同步给其他应用：</p>
+  <ul>
+    <li><strong>Webhook</strong>：Standard Webhooks 格式签名（<code class="mono">webhook-id</code>、<code class="mono">webhook-timestamp</code>、<code class="mono">webhook-signature</code>），每个应用按顺序投递，失败自动重试，最长重试 24 小时。</li>
+    <li><strong>实时事件</strong>：<code class="mono">GET /api/v1/me/events</code>（SSE，使用 Bearer 令牌），适合桌面、移动端和网页，断线后凭 Last-Event-ID 续传。</li>
+    <li><strong>变更流</strong>：<code class="mono">GET /api/v1/users/changes?cursor=</code>（client_credentials + <code class="mono">users:sync</code>），用于对账和补偿。</li>
+    <li><strong>Back-Channel Logout</strong>：用户退出或在 SSO 中移除设备时，通知应用后端立即结束对应会话。</li>
+  </ul>
+</section>
+
+<section class="card">
+  <h2>5. 第一方应用的应用内登录</h2>
+  <p>管理员把应用标记为“第一方”并开启“允许应用内登录”后，应用可以用自己的登录界面调用 <code class="mono">POST /oauth/authorize-challenge</code>。账号开启了两步验证时，接口会要求再提交一次验证码。注册新用户调用 <code class="mono">POST /api/v1/native/register</code>（需要开放自助注册）。各 SDK 都封装了这两个流程。</p>
+</section>
+
+<section class="card" id="api-tokens">
+  <h2>6. API 令牌与命令行接入</h2>
+  <p>API 令牌是给终端、脚本和 CI 用的长期凭证，直接放在 <code class="mono">Authorization: Bearer</code> 里调用，不需要走 OAuth 授权流程。令牌分两类，互不通用：</p>
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>类型</th><th>在哪里创建</th><th>调用地址</th><th>权限</th><th>最长有效期</th></tr></thead>
+    <tbody>
+      <tr><td><strong>开发者令牌</strong><br><code class="mono small">msso_dev_…</code></td><td><a href="/developer#api-tokens">开发者中心 → API 令牌</a></td><td class="mono small">{{.Data.Issuer}}/api/v1/developer</td><td class="mono small">apps:read · apps:write</td><td>365 天</td></tr>
+      <tr><td><strong>控制台令牌</strong><br><code class="mono small">msso_adm_…</code></td><td>超级管理员控制台 → API 令牌（需验证码）</td><td class="mono small">{{.Data.AdminURL}}/api/v1</td><td class="mono small">stats:read · users:read/write · clients:read/write · settings:read/write · audit:read</td><td>90 天</td></tr>
+    </tbody>
+  </table>
+  </div>
+  <ul>
+    <li><strong>只显示一次</strong>：服务器只保存令牌的 HMAC 指纹，丢失后只能轮换或重新创建。</li>
+    <li><strong>到期与提醒</strong>：每个响应都带 <code class="mono">Moon-Token-Expires-At</code>（RFC 3339）和 <code class="mono">Moon-Token-Expires-Soon</code>（剩余不足 7 天且不足有效期四分之一时为 <code class="mono">true</code>），页面和命令行据此提醒轮换。</li>
+    <li><strong>轮换</strong>：<code class="mono">POST …/token/rotate</code>，可选 <code class="mono">{"grace_seconds": 3600}</code>（0–604800，默认 1 小时）。新令牌继承名称、权限、IP 白名单和原有效期；宽限期内旧令牌仍可用，响应带 <code class="mono">Moon-Token-Rotated: true</code>。</li>
+    <li><strong>吊销</strong>：<code class="mono">DELETE …/token</code> 吊销当前令牌；也可在页面吊销。管理员重置密码、停用或删除账号时，该账号的令牌立即失效。</li>
+    <li><strong>IP 白名单</strong>：可限制为若干 IP 或网段（IPv4/IPv6），其他来源返回 <code class="mono">403 ip_not_allowed</code>。</li>
+    <li><strong>审计</strong>：所有操作以令牌所有者的身份记入审计日志，并标注 <code class="mono">token:…</code>。</li>
+    <li><strong>错误</strong>：<code class="mono">401 invalid_token</code>（无效、过期、吊销或站点不对）、<code class="mono">403 insufficient_scope</code>、<code class="mono">422 validation_failed</code>（带 <code class="mono">field</code>）、<code class="mono">429 rate_limited</code>（带 <code class="mono">Retry-After</code>）。</li>
+  </ul>
+
+  <h3>命令行工具 moonsso</h3>
+  <p>安装（Go 1.27+）：</p>
+  <pre class="mono small code-block">go install sso.moonl.cloud/sdk/go/cmd/moonsso@latest</pre>
+  <p>或在 <a href="/sdk#cli">SDK 下载</a> 页面下载 Windows / macOS / Linux 的预编译文件。登录后令牌保存在本机配置目录（权限 0600），开发者令牌和控制台令牌分开保存：</p>
+  <pre class="mono small code-block">moonsso login                      # 粘贴令牌（不回显），按前缀自动识别类型
+moonsso whoami
+moonsso apps list
+moonsso apps create --name "My App" --type web --redirect-uri https://myapp.example/callback
+moonsso apps update ms_xxx --set client_name=新名字 --set require_dpop=true
+moonsso apps rotate-secret ms_xxx
+moonsso token rotate --grace 1h    # 自动保存新令牌
+
+moonsso admin stats                # 使用控制台令牌
+moonsso admin users list --q alice
+moonsso admin users disable alice
+moonsso admin settings set registration_open=false
+moonsso admin audit --actor @admin --limit 20
+moonsso api GET apps               # 任意接口的原始调用</pre>
+  <p>CI 中可以直接用环境变量：<code class="mono">MOONSSO_TOKEN</code>（开发者令牌）或 <code class="mono">MOONSSO_ADMIN_TOKEN</code>（控制台令牌）。加 <code class="mono">--json</code> 输出原始 JSON。</p>
+
+  <h3>直接用 curl</h3>
+  <pre class="mono small code-block"># 开发者：创建应用（RFC 7591 元数据）
+curl -X POST {{.Data.Issuer}}/api/v1/developer/apps \
+  -H "Authorization: Bearer $MOONSSO_TOKEN" -H "Content-Type: application/json" \
+  -d '{"client_name":"My App","redirect_uris":["https://myapp.example/callback"]}'
+
+# 开发者：部分修改（未提供的字段保持不变）
+curl -X PATCH {{.Data.Issuer}}/api/v1/developer/apps/ms_xxx \
+  -H "Authorization: Bearer $MOONSSO_TOKEN" -H "Content-Type: application/json" \
+  -d '{"webhook_url":"https://myapp.example/hooks/sso"}'
+
+# 轮换当前令牌，旧令牌再保留 1 小时
+curl -X POST {{.Data.Issuer}}/api/v1/developer/token/rotate \
+  -H "Authorization: Bearer $MOONSSO_TOKEN" -d '{"grace_seconds":3600}'
+
+# 超级管理员：停用用户、关闭自助注册
+curl -X POST {{.Data.AdminURL}}/api/v1/users/alice/disable -H "Authorization: Bearer $MOONSSO_ADMIN_TOKEN"
+curl -X PATCH {{.Data.AdminURL}}/api/v1/settings -H "Authorization: Bearer $MOONSSO_ADMIN_TOKEN" \
+  -H "Content-Type: application/json" -d '{"registration_open":false}'</pre>
+  <p>完整接口定义：开发者 API 见 <a href="/openapi.yaml">{{.Data.Issuer}}/openapi.yaml</a>（<code class="mono">developer</code> 标签）；超级管理员 API 见 <a href="{{.Data.AdminURL}}/openapi.yaml">{{.Data.AdminURL}}/openapi.yaml</a>。</p>
+</section>
+{{end}}

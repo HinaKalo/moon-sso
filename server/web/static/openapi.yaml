@@ -1,0 +1,649 @@
+openapi: 3.1.0
+info:
+  title: Moon SSO API
+  version: "1.0"
+  description: |
+    OAuth 2.x / OpenID Connect authorization server and account API of Moon SSO.
+
+    * Discovery: `GET /.well-known/openid-configuration`
+    * All tokens are JWTs signed with keys from `/.well-known/jwks.json`
+      (ID tokens RS256 by default, access tokens ES256, `typ: at+jwt`).
+    * Refresh tokens rotate on every use. Re-presenting a refresh token within
+      60 seconds of its rotation (same client, same DPoP key) returns the same
+      successor, so concurrent refreshes and network retries are safe.
+    * Errors use `{"error": "...", "error_description": "..."}`.
+servers:
+  - url: https://sso.moonl.cloud
+security: []
+tags:
+  - name: oauth
+  - name: account
+  - name: sync
+  - name: registration
+  - name: developer
+    description: |
+      Developer API for terminals, scripts and CI. Authenticate with a developer
+      API token (`Authorization: Bearer msso_dev_…`) created in the developer
+      center. Only apps owned by the token's owner are visible.
+paths:
+  /oauth/authorize:
+    get:
+      tags: [oauth]
+      summary: Authorization endpoint (code flow with mandatory PKCE S256)
+      parameters:
+        - {name: client_id, in: query, required: true, schema: {type: string}}
+        - {name: redirect_uri, in: query, required: true, schema: {type: string}}
+        - {name: response_type, in: query, required: true, schema: {type: string, enum: [code]}}
+        - {name: scope, in: query, required: true, schema: {type: string}, example: openid profile offline_access}
+        - {name: state, in: query, schema: {type: string}}
+        - {name: nonce, in: query, schema: {type: string}}
+        - {name: code_challenge, in: query, required: true, schema: {type: string}}
+        - {name: code_challenge_method, in: query, required: true, schema: {type: string, enum: [S256]}}
+        - {name: prompt, in: query, schema: {type: string, enum: [none, login, consent, select_account]}}
+        - {name: max_age, in: query, schema: {type: integer}}
+        - {name: id_token_hint, in: query, schema: {type: string}}
+        - {name: login_hint, in: query, schema: {type: string}}
+        - {name: response_mode, in: query, schema: {type: string, enum: [query, form_post]}}
+        - {name: resource, in: query, schema: {type: string}}
+        - {name: dpop_jkt, in: query, schema: {type: string}, description: JWK thumbprint binding the code to a DPoP key}
+      responses:
+        "302":
+          description: Redirect to redirect_uri with `code`, `state` and `iss` (RFC 9207), or `error`.
+  /oauth/token:
+    post:
+      tags: [oauth]
+      summary: Token endpoint
+      description: |
+        Client authentication: `client_secret_basic`, `client_secret_post` or `none` (public clients send `client_id`).
+        Send a `DPoP` proof header to bind refresh tokens of public clients; the server answers
+        `use_dpop_nonce` with a `DPoP-Nonce` header when a nonce is required and returns a fresh
+        `DPoP-Nonce` on every response. Retry refresh_token and client_credentials requests once on network errors, 502, 503 or 504; never retry an authorization_code exchange (codes are single-use and a replay revokes their tokens).
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              required: [grant_type]
+              properties:
+                grant_type: {type: string, enum: [authorization_code, refresh_token, client_credentials]}
+                code: {type: string}
+                redirect_uri: {type: string, description: "Must equal the authorize request; empty for first-party challenge codes"}
+                code_verifier: {type: string}
+                refresh_token: {type: string}
+                scope: {type: string, description: "refresh: narrows the access token; client_credentials: e.g. users:sync"}
+                client_id: {type: string}
+                client_secret: {type: string}
+      responses:
+        "200":
+          description: Tokens
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/TokenResponse"}
+        "400": {$ref: "#/components/responses/OAuthError"}
+        "401": {$ref: "#/components/responses/OAuthError"}
+  /oauth/authorize-challenge:
+    post:
+      tags: [oauth]
+      summary: First-party native login (draft-ietf-oauth-first-party-apps)
+      description: |
+        Only for clients an administrator marked `first_party` + `native_login`.
+        Step 1 sends username/password; if a second factor is required the response is
+        `400 {"error":"insufficient_authorization","auth_session":"...","required":"otp"}` and
+        step 2 sends `auth_session` + `otp`. Success returns an authorization code that is
+        redeemed at `/oauth/token` with `code_verifier` and no `redirect_uri`.
+      requestBody:
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              required: [client_id, code_challenge, code_challenge_method]
+              properties:
+                client_id: {type: string}
+                username: {type: string}
+                password: {type: string}
+                auth_session: {type: string}
+                otp: {type: string}
+                scope: {type: string}
+                code_challenge: {type: string}
+                code_challenge_method: {type: string, enum: [S256]}
+      responses:
+        "200":
+          description: Authorization code
+          content:
+            application/json:
+              schema: {type: object, properties: {authorization_code: {type: string}}}
+        "400": {$ref: "#/components/responses/OAuthError"}
+        "403": {$ref: "#/components/responses/OAuthError"}
+  /api/v1/native/register:
+    post:
+      tags: [registration]
+      summary: Register inside a first-party app and receive an authorization code
+      requestBody:
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              required: [client_id, username, password, code_challenge, code_challenge_method]
+              properties:
+                client_id: {type: string}
+                username: {type: string}
+                password: {type: string}
+                display_name: {type: string}
+                scope: {type: string}
+                code_challenge: {type: string}
+                code_challenge_method: {type: string, enum: [S256]}
+      responses:
+        "200":
+          description: Authorization code for the new user
+          content:
+            application/json:
+              schema: {type: object, properties: {authorization_code: {type: string}}}
+        "403": {description: Registration closed}
+        "422": {$ref: "#/components/responses/ValidationError"}
+  /oauth/userinfo:
+    get:
+      tags: [oauth]
+      security: [{bearer: []}]
+      responses:
+        "200":
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/Profile"}
+          description: Claims
+  /oauth/revoke:
+    post:
+      tags: [oauth]
+      summary: Token revocation (RFC 7009)
+      responses: {"200": {description: Always OK}}
+  /oauth/introspect:
+    post:
+      tags: [oauth]
+      summary: Token introspection (RFC 7662), confidential clients only
+      responses: {"200": {description: Introspection result}}
+  /oauth/end_session:
+    get:
+      tags: [oauth]
+      summary: RP-initiated logout
+      parameters:
+        - {name: id_token_hint, in: query, schema: {type: string}}
+        - {name: client_id, in: query, schema: {type: string}}
+        - {name: post_logout_redirect_uri, in: query, schema: {type: string}}
+        - {name: state, in: query, schema: {type: string}}
+      responses: {"302": {description: Redirect after logout}, "200": {description: Confirmation page}}
+  /oauth/register:
+    post:
+      tags: [registration]
+      summary: Dynamic client registration (RFC 7591)
+      description: Requires an initial access token (`Authorization: Bearer iat_...`) from the developer center.
+      security: [{bearer: []}]
+      requestBody:
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/ClientMetadata"}
+      responses:
+        "201":
+          description: Client created (status may be pending_approval)
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/ClientInformation"}
+        "400": {$ref: "#/components/responses/OAuthError"}
+  /oauth/register/{client_id}:
+    parameters:
+      - {name: client_id, in: path, required: true, schema: {type: string}}
+    get:
+      tags: [registration]
+      summary: Read registration (RFC 7592, registration access token)
+      security: [{bearer: []}]
+      responses: {"200": {description: Client information}}
+    put:
+      tags: [registration]
+      summary: Update registration
+      security: [{bearer: []}]
+      responses: {"200": {description: Updated}}
+    delete:
+      tags: [registration]
+      summary: Delete registration
+      security: [{bearer: []}]
+      responses: {"204": {description: Deleted}}
+  /api/v1/me:
+    get:
+      tags: [account]
+      summary: Current user's profile as seen by this client
+      security: [{bearer: []}]
+      responses:
+        "200":
+          description: Profile (ETag "pv-<profile_version>")
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/Profile"}
+        "304": {description: Not modified (If-None-Match)}
+    patch:
+      tags: [account]
+      summary: Update username and/or nickname (scope profile:write)
+      description: Optional `If-Match: "pv-<version>"` gives optimistic concurrency (412 on conflict).
+      security: [{bearer: []}]
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                username: {type: string}
+                display_name: {type: string}
+      responses:
+        "200":
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/Profile"}
+          description: Updated profile
+        "412": {description: Version conflict}
+        "422": {$ref: "#/components/responses/ValidationError"}
+  /api/v1/me/avatar:
+    put:
+      tags: [account]
+      summary: Upload avatar (scope profile:write); raw image body or multipart field "avatar"; ≤5 MB
+      security: [{bearer: []}]
+      requestBody:
+        content:
+          image/*: {schema: {type: string, format: binary}}
+          multipart/form-data:
+            schema: {type: object, properties: {avatar: {type: string, format: binary}}}
+      responses:
+        "200":
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/Profile"}
+          description: Updated profile
+    delete:
+      tags: [account]
+      summary: Remove avatar (scope profile:write)
+      security: [{bearer: []}]
+      responses: {"200": {description: Updated profile}}
+  /api/v1/me/password:
+    post:
+      tags: [account]
+      summary: Change password (scope password:write)
+      description: Other devices are signed out; the session of this token stays unless keep_this_device=false.
+      security: [{bearer: []}]
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [current_password, new_password]
+              properties:
+                current_password: {type: string}
+                new_password: {type: string}
+                keep_this_device: {type: boolean, default: true}
+      responses:
+        "200": {description: Changed}
+        "422": {$ref: "#/components/responses/ValidationError"}
+  /api/v1/me/events:
+    get:
+      tags: [sync]
+      summary: Live profile events for this user and client (Server-Sent Events)
+      description: |
+        Authenticate with the Authorization header (fetch-based SSE). Send `Last-Event-ID` to resume.
+        Events: user.updated, user.password_changed, user.disabled, user.enabled, user.deleted,
+        consent.revoked, plus `resync` (history expired: refetch /api/v1/me) and `token_expired`
+        (reconnect with a fresh access token). Each `data:` is an Event object.
+      security: [{bearer: []}]
+      responses: {"200": {description: text/event-stream}}
+  /api/v1/register:
+    post:
+      tags: [registration]
+      summary: Create an end-user account from an application (client authentication required)
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [username, password]
+              properties:
+                username: {type: string}
+                password: {type: string}
+                display_name: {type: string}
+      responses:
+        "201": {description: Created; continue with the authorization flow using login_hint}
+        "403": {description: Registration closed}
+        "422": {$ref: "#/components/responses/ValidationError"}
+  /api/v1/registration:
+    get:
+      tags: [registration]
+      summary: Whether self-service registration is open, and password/username rules
+      responses: {"200": {description: Info}}
+  /api/v1/users/changes:
+    get:
+      tags: [sync]
+      summary: Ordered change feed for users who granted this client (client_credentials, scope users:sync)
+      security: [{bearer: []}]
+      parameters:
+        - {name: cursor, in: query, schema: {type: string}}
+        - {name: limit, in: query, schema: {type: integer, maximum: 500}}
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  events: {type: array, items: {$ref: "#/components/schemas/Event"}}
+                  next_cursor: {type: string}
+                  has_more: {type: boolean}
+          description: Events
+        "410": {description: Cursor older than retention; resync with GET /api/v1/users}
+  /api/v1/users:
+    get:
+      tags: [sync]
+      summary: Snapshot of all users who granted this client (scope users:sync)
+      description: Continue with /api/v1/users/changes from the watermark of the first page.
+      security: [{bearer: []}]
+      responses: {"200": {description: Page of users with watermark}}
+  /api/v1/users/{sub}:
+    get:
+      tags: [sync]
+      security: [{bearer: []}]
+      parameters: [{name: sub, in: path, required: true, schema: {type: string}}]
+      responses: {"200": {description: User snapshot}, "404": {description: Not granted}}
+  /api/v1/developer/token:
+    get:
+      tags: [developer]
+      summary: Describe the calling token and its owner
+      security: [{developerToken: []}]
+      responses:
+        "200":
+          description: Token and owner
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  token: {$ref: "#/components/schemas/APIToken"}
+                  user: {type: object, properties: {username: {type: string}, display_name: {type: string}, sub: {type: string}}}
+                  api: {type: string}
+        "401": {$ref: "#/components/responses/TokenError"}
+    delete:
+      tags: [developer]
+      summary: Revoke the calling token
+      security: [{developerToken: []}]
+      responses: {"204": {description: Revoked}, "401": {$ref: "#/components/responses/TokenError"}}
+  /api/v1/developer/token/rotate:
+    post:
+      tags: [developer]
+      summary: Rotate the calling token
+      description: The successor keeps name, scopes, IP allowlist and lifetime. The old token keeps working for `grace_seconds` (default 3600, max 604800) and answers with `Moon-Token-Rotated: true`.
+      security: [{developerToken: []}]
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/RotateRequest"}
+      responses:
+        "201":
+          description: New token (shown once)
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/IssuedAPIToken"}
+        "409": {description: Token already rotated, revoked or expired, content: {application/json: {schema: {$ref: "#/components/schemas/Error"}}}}
+        "422": {$ref: "#/components/responses/ValidationError"}
+  /api/v1/developer/apps:
+    get:
+      tags: [developer]
+      summary: List my apps (apps:read)
+      security: [{developerToken: []}]
+      responses:
+        "200":
+          description: Apps
+          content:
+            application/json:
+              schema: {type: object, properties: {apps: {type: array, items: {$ref: "#/components/schemas/App"}}, total: {type: integer}}}
+        "403": {$ref: "#/components/responses/ScopeError"}
+    post:
+      tags: [developer]
+      summary: Create an app (apps:write)
+      description: Same rules as the developer center; with "approval" mode the app starts as pending_approval.
+      security: [{developerToken: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/AppMetadata"}
+      responses:
+        "201":
+          description: Created; client_secret, registration_access_token and webhook_secret are shown once
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/App"}
+        "403": {$ref: "#/components/responses/ScopeError"}
+        "422": {$ref: "#/components/responses/ValidationError"}
+  /api/v1/developer/apps/{client_id}:
+    parameters:
+      - {name: client_id, in: path, required: true, schema: {type: string}}
+    get:
+      tags: [developer]
+      summary: Get an app (apps:read)
+      security: [{developerToken: []}]
+      responses:
+        "200": {description: App, content: {application/json: {schema: {$ref: "#/components/schemas/App"}}}}
+        "404": {description: Not found or not yours}
+    patch:
+      tags: [developer]
+      summary: Update an app (apps:write)
+      description: Partial update; omitted fields keep their values and read-only fields in the body are ignored, so a fetched app can be edited and sent back. Unknown fields are rejected with 422.
+      security: [{developerToken: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/AppMetadata"}
+      responses:
+        "200": {description: Updated (webhook_secret present when a webhook was just configured), content: {application/json: {schema: {$ref: "#/components/schemas/App"}}}}
+        "422": {$ref: "#/components/responses/ValidationError"}
+    delete:
+      tags: [developer]
+      summary: Delete an app (apps:write)
+      security: [{developerToken: []}]
+      responses: {"204": {description: Deleted}}
+  /api/v1/developer/apps/{client_id}/rotate-secret:
+    post:
+      tags: [developer]
+      summary: Rotate the client secret (apps:write)
+      security: [{developerToken: []}]
+      parameters: [{name: client_id, in: path, required: true, schema: {type: string}}]
+      responses: {"200": {description: "{client_id, client_secret} (shown once)"}}
+  /api/v1/developer/apps/{client_id}/rotate-webhook-secret:
+    post:
+      tags: [developer]
+      summary: Rotate the webhook signing secret (apps:write)
+      security: [{developerToken: []}]
+      parameters: [{name: client_id, in: path, required: true, schema: {type: string}}]
+      responses: {"200": {description: "{client_id, webhook_secret} (shown once)"}, "409": {description: No webhook configured}}
+  /api/v1/developer/apps/{client_id}/webhook-test:
+    post:
+      tags: [developer]
+      summary: Send a ping event to the webhook (apps:write)
+      security: [{developerToken: []}]
+      parameters: [{name: client_id, in: path, required: true, schema: {type: string}}]
+      responses: {"200": {description: "{delivered: bool, error?: string}"}, "429": {description: Too many tests}}
+components:
+  securitySchemes:
+    bearer: {type: http, scheme: bearer}
+    developerToken: {type: http, scheme: bearer, description: "Developer API token (msso_dev_…), public host only"}
+  responses:
+    OAuthError:
+      description: OAuth error
+      content:
+        application/json:
+          schema: {$ref: "#/components/schemas/Error"}
+    ValidationError:
+      description: Validation failed
+      content:
+        application/json:
+          schema: {$ref: "#/components/schemas/Error"}
+    TokenError:
+      description: "invalid_token: missing, unknown, expired or revoked token, or a token of the other kind"
+      headers:
+        WWW-Authenticate: {schema: {type: string}}
+      content:
+        application/json:
+          schema: {$ref: "#/components/schemas/Error"}
+    ScopeError:
+      description: "insufficient_scope or ip_not_allowed"
+      content:
+        application/json:
+          schema: {$ref: "#/components/schemas/Error"}
+  schemas:
+    Error:
+      type: object
+      properties:
+        error: {type: string}
+        error_description: {type: string}
+        field: {type: string}
+    TokenResponse:
+      type: object
+      properties:
+        access_token: {type: string}
+        token_type: {type: string, enum: [Bearer]}
+        expires_in: {type: integer}
+        refresh_token: {type: string}
+        id_token: {type: string}
+        scope: {type: string}
+    Profile:
+      type: object
+      properties:
+        sub: {type: string, description: Client-specific subject (pairwise for third-party clients)}
+        preferred_username: {type: string}
+        name: {type: string}
+        nickname: {type: string}
+        picture: {type: [string, "null"], format: uri}
+        updated_at: {type: integer}
+        profile_version: {type: integer}
+        totp_enabled: {type: boolean}
+    Event:
+      type: object
+      description: Delivered identically by webhooks (Standard Webhooks headers), the changes feed and SSE.
+      properties:
+        id: {type: string, example: evt_42}
+        seq: {type: integer}
+        type: {type: string, enum: [user.updated, user.password_changed, user.disabled, user.enabled, user.deleted, consent.revoked, ping], description: "ping is only sent by the 'send test event' button; its data is {client_id}"}
+        occurred_at: {type: string, format: date-time}
+        data:
+          type: object
+          properties:
+            sub: {type: string}
+            status: {type: string, enum: [active, disabled, deleted]}
+            preferred_username: {type: string}
+            name: {type: string}
+            nickname: {type: string}
+            picture: {type: [string, "null"]}
+            profile_version: {type: integer}
+            updated_at: {type: integer}
+            changed: {type: array, items: {type: string}}
+    ClientMetadata:
+      type: object
+      required: [client_name, redirect_uris]
+      properties:
+        client_name: {type: string}
+        redirect_uris: {type: array, items: {type: string}}
+        post_logout_redirect_uris: {type: array, items: {type: string}}
+        grant_types: {type: array, items: {type: string}}
+        token_endpoint_auth_method: {type: string, enum: [client_secret_basic, client_secret_post, none]}
+        application_type: {type: string, enum: [web, native]}
+        scope: {type: string}
+        id_token_signed_response_alg: {type: string, enum: [RS256, ES256]}
+        backchannel_logout_uri: {type: string}
+        dpop_bound_access_tokens: {type: boolean}
+        webhook_url: {type: string}
+        webhook_events: {type: array, items: {type: string}}
+        logo_uri: {type: string}
+        client_uri: {type: string}
+        policy_uri: {type: string}
+        tos_uri: {type: string}
+    ClientInformation:
+      allOf:
+        - $ref: "#/components/schemas/ClientMetadata"
+        - type: object
+          properties:
+            client_id: {type: string}
+            client_secret: {type: string}
+            registration_access_token: {type: string}
+            registration_client_uri: {type: string}
+            webhook_secret: {type: string}
+            status: {type: string, enum: [active, pending_approval, disabled]}
+    APIToken:
+      type: object
+      properties:
+        id: {type: string, format: uuid}
+        kind: {type: string, enum: [developer, console]}
+        name: {type: string}
+        owner: {type: string}
+        hint: {type: string, example: "msso_dev_AbCd…wxyz"}
+        scopes: {type: array, items: {type: string}}
+        allowed_ips: {type: array, items: {type: string}}
+        status: {type: string, enum: [active, rotating, expired, revoked]}
+        expires_soon: {type: boolean}
+        created_at: {type: string, format: date-time}
+        expires_at: {type: string, format: date-time}
+        last_used_at: {type: [string, "null"], format: date-time}
+        last_used_ip: {type: string}
+        revoked_at: {type: string, format: date-time}
+        rotated_from: {type: string}
+        replaced_by: {type: string}
+    IssuedAPIToken:
+      allOf:
+        - $ref: "#/components/schemas/APIToken"
+        - type: object
+          properties:
+            token: {type: string, description: The secret. Shown only in this response.}
+    RotateRequest:
+      type: object
+      properties:
+        grace_seconds: {type: integer, minimum: 0, maximum: 604800, default: 3600}
+    AppMetadata:
+      allOf:
+        - $ref: "#/components/schemas/ClientMetadata"
+        - type: object
+          properties:
+            description: {type: string}
+            require_dpop: {type: boolean, description: Require DPoP-bound refresh tokens (alias of dpop_bound_access_tokens on input)}
+    App:
+      allOf:
+        - $ref: "#/components/schemas/ClientInformation"
+        - type: object
+          properties:
+            created_at: {type: string, format: date-time}
+            updated_at: {type: string, format: date-time}
+            verified: {type: boolean}
+            has_client_secret: {type: boolean}
+            client_secret_rotated_at: {type: string, format: date-time}
+            subject_type: {type: string, enum: [public, pairwise]}
+            webhook_state: {type: object}
+    ConsoleAppMetadata:
+      allOf:
+        - $ref: "#/components/schemas/AppMetadata"
+        - type: object
+          properties:
+            first_party: {type: boolean}
+            native_login: {type: boolean}
+            skip_consent: {type: boolean}
+            allow_registration: {type: boolean}
+            verified: {type: boolean}
+            require_otp: {type: boolean}
+            subject_type: {type: string, enum: [public, pairwise]}
+            webhook_allow_insecure: {type: boolean}
+            access_token_ttl_seconds: {type: [integer, "null"], minimum: 60, maximum: 3600}
+    Settings:
+      type: object
+      properties:
+        site_name: {type: string}
+        registration_open: {type: boolean}
+        client_registration: {type: string, enum: [closed, approval, open]}
+        password_min_length: {type: integer}
+        username_cooldown_days: {type: integer}
+        username_reserve_days: {type: integer}
+        session_idle_days: {type: integer}
+        access_token_minutes: {type: integer}
+        refresh_idle_days: {type: integer}
+        refresh_absolute_days: {type: integer}
+        max_clients_per_developer: {type: integer}

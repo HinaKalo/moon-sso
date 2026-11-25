@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Moon SSO SPA example</title>
+    <!-- No bundler: map the bare specifier to the package's ESM build. -->
+    <script type="importmap">
+      { "imports": { "@moon-sso/browser": "./node_modules/@moon-sso/browser/dist/index.js" } }
+    </script>
+    <style>
+      body { font: 15px/1.5 system-ui, sans-serif; max-width: 40rem; margin: 2rem auto; padding: 0 1rem; }
+      [hidden] { display: none !important; }
+      form { display: grid; gap: .5rem; margin: 1rem 0; }
+      #status { color: #666; }
+    </style>
+  </head>
+  <body>
+    <h1>Moon SSO SPA</h1>
+    <p id="status">Loading…</p>
+
+    <section id="signed-out" hidden>
+      <button id="login-redirect">Sign in (redirect)</button>
+      <form id="login-form">
+        <input name="username" autocomplete="username" placeholder="Username" required />
+        <input name="password" type="password" autocomplete="current-password" placeholder="Password" required />
+        <button>Sign in here</button>
+      </form>
+      <form id="otp-form" hidden>
+        <input name="otp" inputmode="numeric" autocomplete="one-time-code" placeholder="6-digit code" required />
+        <button>Verify</button>
+      </form>
+    </section>
+
+    <section id="signed-in" hidden>
+      <p>Signed in as <strong id="name"></strong> (<span id="username"></span>)</p>
+      <form id="nickname-form">
+        <input name="nickname" placeholder="Nickname" />
+        <button>Save nickname</button>
+      </form>
+      <button id="logout">Sign out</button>
+    </section>
+
+    <script type="module" src="./dist/main.js"></script>
+  </body>
+</html>

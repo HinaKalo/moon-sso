@@ -1,0 +1,12 @@
+{{define "content"}}
+<section class="card narrow">
+  <h1>退出登录</h1>
+  <p>确定要退出 <strong>{{.User.Name}}</strong> 吗？退出后，使用此会话登录的应用也会收到登出通知。</p>
+  <form method="post" action="/logout" class="row">
+    {{template "csrf" .}}
+    <input type="hidden" name="next" value="{{.Form.next}}">
+    <button class="btn btn-danger" type="submit">退出登录</button>
+    <a class="btn btn-ghost" href="/account">取消</a>
+  </form>
+</section>
+{{end}}

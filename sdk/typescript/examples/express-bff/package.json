@@ -1,0 +1,21 @@
+{
+  "name": "moon-sso-example-express-bff",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Minimal Express backend-for-frontend using @moon-sso/node",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "start": "node dist/server.js"
+  },
+  "dependencies": {
+    "@moon-sso/node": "file:../../packages/node",
+    "express": "^5.1.0"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.0",
+    "@types/node": "^24.0.0",
+    "typescript": "^5.9.0"
+  }
+}

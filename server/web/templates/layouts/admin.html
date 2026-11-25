@@ -1,0 +1,74 @@
+{{define "console_head"}}
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="dark">
+<meta name="robots" content="noindex, nofollow">
+<meta name="htmx-config" content='{"includeIndicatorStyles":false,"allowEval":false,"allowScriptTags":false,"historyCacheSize":0,"selfRequestsOnly":true,"responseHandling":[{"code":"204","swap":false},{"code":"[23]..","swap":true},{"code":"4..","swap":true,"error":false},{"code":"5..","swap":true,"error":true}]}'>
+<link rel="stylesheet" href="{{asset "app.css"}}">
+<link rel="stylesheet" href="{{asset "admin.css"}}">
+<link rel="icon" href="{{asset "admin-favicon.svg"}}" type="image/svg+xml">
+<script src="{{asset "htmx.min.js"}}" defer></script>
+<script src="{{asset "app.js"}}" defer></script>
+{{end}}
+
+{{define "shield"}}<svg viewBox="0 0 32 32" aria-hidden="true"><path d="M16 3 27 7.5v8c0 6.8-4.6 11.5-11 13.5C9.6 27 5 22.3 5 15.5v-8z" fill="currentColor"/><path d="m11.5 16 3.2 3.2 6-6.4" fill="none" stroke="#090c11" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>{{end}}
+
+{{define "admin_layout"}}<!doctype html>
+<html lang="zh-CN">
+<head>
+{{template "console_head" .}}
+<title>{{.Title}} · 超级管理员控制台</title>
+</head>
+<body class="console" hx-boost="true">
+<div class="console-shell">
+  <aside class="console-side">
+    <a class="console-brand" href="/">{{template "shield"}}<span><strong>{{.Site.SiteName}}{{if ne .Env "prod"}}<span class="env-tag">{{.Env}}</span>{{end}}</strong><small>Super Admin Console</small></span></a>
+    <nav class="console-nav" aria-label="控制台导航">
+      <span class="group">概览</span>
+      <a href="/" {{if eq .Nav "dashboard"}}aria-current="page"{{end}}><span class="ico">◈</span>总览</a>
+      <span class="group">SSO 数据</span>
+      <a href="/users" {{if eq .Nav "users"}}aria-current="page"{{end}}><span class="ico">◉</span>用户</a>
+      <a href="/clients" {{if eq .Nav "clients"}}aria-current="page"{{end}}><span class="ico">▣</span>应用</a>
+      <a href="/webhooks" {{if eq .Nav "webhooks"}}aria-current="page"{{end}}><span class="ico">⇄</span>Webhook</a>
+      <span class="group">系统</span>
+      <a href="/settings" {{if eq .Nav "settings"}}aria-current="page"{{end}}><span class="ico">⚙</span>设置</a>
+      <a href="/keys" {{if eq .Nav "keys"}}aria-current="page"{{end}}><span class="ico">⚿</span>签名密钥</a>
+      <a href="/audit" {{if eq .Nav "audit"}}aria-current="page"{{end}}><span class="ico">≡</span>审计日志</a>
+      <span class="group">控制台</span>
+      <a href="/admins" {{if eq .Nav "admins"}}aria-current="page"{{end}}><span class="ico">◆</span>管理员</a>
+      <a href="/api-tokens" {{if eq .Nav "api_tokens"}}aria-current="page"{{end}}><span class="ico">⌁</span>API 令牌</a>
+      <a href="/profile" {{if eq .Nav "profile"}}aria-current="page"{{end}}><span class="ico">○</span>我的账号</a>
+    </nav>
+    {{with .Admin}}
+    <div class="console-me">
+      <div class="who"><strong>{{.Name}}</strong><small>@{{.Username}}</small></div>
+      <form method="post" action="/logout" hx-boost="false">
+        <input type="hidden" name="_csrf" value="{{$.CSRF}}">
+        <button class="btn btn-ghost btn-sm" type="submit">退出</button>
+      </form>
+    </div>
+    {{end}}
+  </aside>
+  <div class="console-main"><main class="page">{{template "content" .}}</main></div>
+</div>
+</body>
+</html>
+{{end}}
+
+{{define "admin_auth"}}<!doctype html>
+<html lang="zh-CN">
+<head>
+{{template "console_head" .}}
+<title>{{.Title}} · 超级管理员控制台</title>
+</head>
+<body class="console">
+<main class="console-auth">
+  <section class="console-auth-card">
+    <div class="console-auth-head">{{template "shield"}}<div><h1>超级管理员控制台{{if ne .Env "prod"}}<span class="env-tag">{{.Env}}</span>{{end}}</h1><p>{{.Site.SiteName}} · Restricted</p></div></div>
+    {{template "auth_form" .}}
+    <p class="console-auth-note">仅限授权管理员 · 控制台账号与 SSO 用户账号相互独立 · 所有操作都会记录</p>
+  </section>
+</main>
+</body>
+</html>
+{{end}}

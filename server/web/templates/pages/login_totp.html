@@ -1,0 +1,21 @@
+{{define "content"}}
+<section class="card auth-card">
+  <h1>两步验证</h1>
+  <p class="muted">打开你的身份验证器 App，输入 6 位验证码</p>
+  {{template "totp_form" .}}
+  <p class="switch"><a href="/login">返回登录</a></p>
+</section>
+{{end}}
+
+{{define "totp_form"}}
+<form method="post" action="/login/totp" hx-post="/login/totp" hx-target="this" hx-swap="outerHTML" hx-disabled-elt="find button" class="form">
+  {{template "csrf" .}}
+  {{template "alerts" .}}
+  <label class="field">
+    <span>验证码</span>
+    <input name="code" inputmode="numeric" pattern="[0-9 ]{6,7}" maxlength="7" autocomplete="one-time-code" required autofocus class="otp">
+  </label>
+  {{template "ferr" dict "Errors" .Errors "Field" "code"}}
+  <button class="btn btn-primary btn-block" type="submit">验证 {{template "spinner"}}</button>
+</form>
+{{end}}

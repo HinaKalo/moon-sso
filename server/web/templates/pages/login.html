@@ -1,0 +1,27 @@
+{{define "content"}}
+<section class="card auth-card">
+  <h1>登录</h1>
+  <p class="muted">使用 {{.Site.SiteName}} 账号登录所有接入的应用</p>
+  {{template "login_form" .}}
+  {{if .Site.RegistrationOpen}}
+  <p class="switch">还没有账号？<a href="/register{{with .Form.next}}?next={{.}}{{end}}">立即注册</a></p>
+  {{end}}
+</section>
+{{end}}
+
+{{define "login_form"}}
+<form method="post" action="/login" hx-post="/login" hx-target="this" hx-swap="outerHTML" hx-disabled-elt="find button" class="form">
+  {{template "csrf" .}}
+  <input type="hidden" name="next" value="{{.Form.next}}">
+  {{template "alerts" .}}
+  <label class="field">
+    <span>用户名</span>
+    <input name="username" value="{{.Form.username}}" autocomplete="username" autocapitalize="none" spellcheck="false" required autofocus maxlength="32">
+  </label>
+  <label class="field">
+    <span>密码</span>
+    <input name="password" type="password" autocomplete="current-password" required maxlength="128">
+  </label>
+  <button class="btn btn-primary btn-block" type="submit">登录 {{template "spinner"}}</button>
+</form>
+{{end}}

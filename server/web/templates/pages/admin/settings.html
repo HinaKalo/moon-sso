@@ -1,0 +1,33 @@
+{{define "content"}}
+<div class="page-head"><h1>系统设置</h1><p class="muted">修改立即生效，并写入审计日志。</p></div>
+<section class="card">{{template "settings_form" .}}</section>
+{{end}}
+
+{{define "settings_form"}}
+{{$s := .Data.Set}}
+<form id="settings-form" method="post" action="/settings" hx-post="/settings" hx-target="this" hx-swap="outerHTML" class="form">
+  {{template "csrf" .}}
+  {{template "alerts" .}}
+  <label class="field"><span>站点名称</span><input name="site_name" value="{{$s.SiteName}}" maxlength="60" required></label>
+  <h2 class="gap-top">注册</h2>
+  <label class="check"><input type="checkbox" name="registration_open" value="1" {{if $s.RegistrationOpen}}checked{{end}}><span><strong>开放用户自助注册</strong> — 关闭后只能由管理员创建账号（网页、API、应用内注册全部关闭）</span></label>
+  <label class="field"><span>应用自助注册</span>
+    <select name="client_registration">
+      <option value="closed" {{if eq $s.ClientRegistration "closed"}}selected{{end}}>关闭 — 只有管理员可以创建应用</option>
+      <option value="approval" {{if eq $s.ClientRegistration "approval"}}selected{{end}}>需要审核 — 开发者可创建，管理员审核后启用</option>
+      <option value="open" {{if eq $s.ClientRegistration "open"}}selected{{end}}>开放 — 开发者创建后立即可用</option>
+    </select>
+  </label>
+  <label class="field"><span>每位开发者最多应用数 <em>0 表示不限</em></span><input name="max_clients_per_developer" type="number" min="0" max="1000" value="{{$s.MaxClientsPerDeveloper}}"></label>
+  <h2 class="gap-top">账号</h2>
+  <label class="field"><span>密码最短长度</span><input name="password_min_length" type="number" min="8" max="64" value="{{$s.PasswordMinLength}}"></label>
+  <label class="field"><span>用户名修改冷却（天）</span><input name="username_cooldown_days" type="number" min="0" max="365" value="{{$s.UsernameCooldownDays}}"></label>
+  <label class="field"><span>旧用户名保留（天）</span><input name="username_reserve_days" type="number" min="0" max="365" value="{{$s.UsernameReserveDays}}"></label>
+  <h2 class="gap-top">会话与令牌</h2>
+  <label class="field"><span>浏览器会话空闲过期（天）</span><input name="session_idle_days" type="number" min="1" max="90" value="{{$s.SessionIdleDays}}"></label>
+  <label class="field"><span>Access Token 有效期（分钟）</span><input name="access_token_minutes" type="number" min="1" max="60" value="{{$s.AccessTokenMinutes}}"></label>
+  <label class="field"><span>刷新令牌空闲过期（天）</span><input name="refresh_idle_days" type="number" min="1" max="365" value="{{$s.RefreshIdleDays}}"></label>
+  <label class="field"><span>刷新令牌绝对过期（天，offline_access）</span><input name="refresh_absolute_days" type="number" min="1" max="365" value="{{$s.RefreshAbsoluteDays}}"></label>
+  <button class="btn btn-primary" type="submit">保存设置</button>
+</form>
+{{end}}

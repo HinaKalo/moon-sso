@@ -1,0 +1,60 @@
+[build-system]
+requires = ["hatchling>=1.21"]
+build-backend = "hatchling.build"
+
+[project]
+name = "moon_sso"
+dynamic = ["version"]
+description = "Python SDK for Moon SSO (OAuth 2.x / OpenID Connect): login, token lifecycle, account API, webhooks, back-channel logout, change feed and framework adapters."
+readme = "README.md"
+requires-python = ">=3.10"
+authors = [{ name = "Moon SSO" }]
+keywords = ["oauth2", "openid-connect", "oidc", "sso", "dpop", "webhooks"]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3 :: Only",
+    "Framework :: FastAPI",
+    "Framework :: Flask",
+    "Framework :: Django",
+    "Typing :: Typed",
+    "Topic :: Security",
+    "Intended Audience :: Developers",
+]
+dependencies = [
+    "httpx>=0.25",
+    "PyJWT[crypto]>=2.8",
+]
+
+[project.optional-dependencies]
+fastapi = ["fastapi>=0.100", "python-multipart>=0.0.6"]
+flask = ["flask>=2.3"]
+django = ["django>=4.2"]
+test = [
+    "pytest>=8",
+    "pytest-asyncio>=0.23",
+    "fastapi>=0.100",
+    "python-multipart>=0.0.6",
+    "flask>=2.3",
+    "django>=4.2",
+]
+
+[project.urls]
+Homepage = "https://sso.moonl.cloud"
+Documentation = "https://sso.moonl.cloud/docs"
+
+[tool.hatch.version]
+path = "src/moon_sso/_version.py"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/moon_sso"]
+
+[tool.hatch.build.targets.sdist]
+include = ["src/moon_sso", "tests", "README.md", "pyproject.toml"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+markers = [
+    "integration: needs the local Moon SSO testbed (MOON_SSO_TESTBED, default http://127.0.0.1:18601)",
+]

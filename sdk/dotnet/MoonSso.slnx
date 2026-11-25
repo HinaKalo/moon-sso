@@ -1,0 +1,12 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/MoonSso.Client/MoonSso.Client.csproj" />
+    <Project Path="src/MoonSso.Desktop/MoonSso.Desktop.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/MoonSso.Tests/MoonSso.Tests.csproj" />
+  </Folder>
+  <Folder Name="/samples/">
+    <Project Path="samples/MoonSso.ConsoleSample/MoonSso.ConsoleSample.csproj" />
+  </Folder>
+</Solution>

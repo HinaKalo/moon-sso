@@ -1,0 +1,28 @@
+{
+  "name": "moon-sso-sdk-typescript",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Moon SSO TypeScript SDK monorepo (@moon-sso/browser, @moon-sso/node)",
+  "workspaces": [
+    "packages/browser",
+    "packages/node"
+  ],
+  "engines": {
+    "node": ">=20.10"
+  },
+  "scripts": {
+    "sync-shared": "node scripts/sync-shared.mjs",
+    "build": "npm run sync-shared && tsc -b packages/browser packages/node",
+    "clean": "node scripts/clean.mjs",
+    "typecheck": "npm run build && tsc -p tsconfig.test.json",
+    "test:unit": "node --test \"packages/*/test/unit/*.test.ts\"",
+    "test:integration": "node --test --test-concurrency=1 \"packages/*/test/integration/*.test.ts\"",
+    "test": "npm run typecheck && npm run test:unit && npm run test:integration",
+    "pack": "npm run build && node scripts/pack.mjs"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "typescript": "^5.9.0"
+  }
+}

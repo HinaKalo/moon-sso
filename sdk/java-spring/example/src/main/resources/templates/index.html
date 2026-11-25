@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="zh-CN" xmlns:th="http://www.thymeleaf.org">
+<head>
+  <meta charset="UTF-8">
+  <title>Moon SSO 示例</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="stylesheet" th:href="@{/css/app.css}">
+</head>
+<body>
+<main>
+  <h1>Moon SSO 示例应用</h1>
+  <div th:if="${user == null}">
+    <p>尚未登录。</p>
+    <p><a class="button" th:href="@{/oauth2/authorization/moon-sso}">使用 Moon SSO 登录</a></p>
+  </div>
+  <div th:if="${user != null}">
+    <p>你好，<strong th:text="${user.preferredUsername}">user</strong>
+      （sub <code th:text="${user.subject}">sub</code>）</p>
+    <p><a class="button" th:href="@{/profile}">个人资料</a></p>
+    <form th:action="@{/logout}" method="post">
+      <button type="submit">退出登录</button>
+    </form>
+  </div>
+</main>
+</body>
+</html>

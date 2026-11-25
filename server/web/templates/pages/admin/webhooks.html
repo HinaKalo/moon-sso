@@ -1,0 +1,38 @@
+{{define "content"}}
+<div class="page-head"><h1>Webhook 投递</h1><p class="muted">每个端点按事件顺序投递，失败按 1 分钟到 24 小时退避重试，最终进入死信；连续失败 3 天自动停用。</p></div>
+<section class="card">
+  <h2>端点</h2>
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>应用</th><th>地址</th><th>游标</th><th>状态</th><th>最近错误</th></tr></thead>
+    <tbody>
+    {{range .Data.Endpoints}}
+      <tr>
+        <td><a href="/clients/{{.ID}}">{{.Name}}</a></td>
+        <td class="mono small">{{.WebhookURL}}</td>
+        <td class="small">seq {{.WebhookCursorSeq}}</td>
+        <td>{{if .WebhookDisabledAt}}<span class="badge badge-err">已停用</span>{{else if .WebhookLastError}}<span class="badge badge-warn">重试 {{.WebhookAttempts}}</span>{{else}}<span class="badge badge-ok">正常</span>{{end}}</td>
+        <td class="small muted">{{.WebhookLastError}}</td>
+      </tr>
+    {{else}}
+      <tr><td colspan="5" class="muted">还没有应用配置 Webhook</td></tr>
+    {{end}}
+    </tbody>
+  </table>
+  </div>
+</section>
+<section class="card">
+  <h2>未处理死信（{{len .Data.Dead}}）</h2>
+  <ul class="list">
+  {{$csrf := .CSRF}}
+  {{range .Data.Dead}}
+    <li class="list-item">
+      <span class="small"><a href="/clients/{{.ClientID}}" class="mono">{{.ClientID}}</a> · seq {{.Seq}} · 尝试 {{.Attempts}} 次 · {{.LastError}} · {{fmtTime .CreatedAt}}</span>
+      <form hx-post="/webhooks/redrive" hx-target="this" hx-swap="outerHTML"><input type="hidden" name="_csrf" value="{{$csrf}}"><input type="hidden" name="id" value="{{.ID}}"><button class="btn btn-ghost btn-sm" type="submit">重投</button></form>
+    </li>
+  {{else}}
+    <li class="muted">没有死信</li>
+  {{end}}
+  </ul>
+</section>
+{{end}}

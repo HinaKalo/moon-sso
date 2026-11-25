@@ -1,0 +1,13 @@
+{{define "content"}}
+<section class="card auth-card">
+  <h1>退出登录</h1>
+  <p>{{with .Data.Client}}「{{.Name}}」请求你退出 {{$.Site.SiteName}}。{{end}}确定要退出 <strong>{{.User.Name}}</strong> 吗？</p>
+  <form method="post" action="/oauth/end_session" class="row">
+    {{template "csrf" .}}
+    <input type="hidden" name="confirm" value="1">
+    {{range $k, $v := .Data.Params}}{{if $v}}<input type="hidden" name="{{$k}}" value="{{$v}}">{{end}}{{end}}
+    <button class="btn btn-danger" type="submit">退出</button>
+    <a class="btn btn-ghost" href="/account">取消</a>
+  </form>
+</section>
+{{end}}

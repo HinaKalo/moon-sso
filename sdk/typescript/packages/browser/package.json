@@ -1,0 +1,36 @@
+{
+  "name": "@moon-sso/browser",
+  "version": "1.0.0",
+  "description": "Moon SSO SDK for browser single-page applications: PKCE login, in-app login, DPoP-bound silent token renewal, account API and live profile events.",
+  "license": "MIT",
+  "type": "module",
+  "sideEffects": false,
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist/**/*.js",
+    "dist/**/*.d.ts",
+    "dist/**/*.js.map",
+    "dist/**/*.d.ts.map",
+    "src/**/*.ts",
+    "README.md"
+  ],
+  "keywords": [
+    "oauth2",
+    "openid-connect",
+    "pkce",
+    "dpop",
+    "sso",
+    "moon-sso"
+  ],
+  "engines": {
+    "node": ">=20.10"
+  }
+}

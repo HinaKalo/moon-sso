@@ -1,0 +1,12 @@
+{{define "auth_form"}}
+<form method="post" action="/login" hx-post="/login" hx-target="this" hx-swap="outerHTML" hx-disabled-elt="find button" class="form">
+  {{template "csrf" .}}
+  {{template "alerts" .}}
+  <label class="field"><span>管理员账号</span>
+    <input name="username" value="{{.Form.username}}" autocomplete="username" autocapitalize="none" spellcheck="false" required autofocus maxlength="32"></label>
+  <label class="field"><span>密码</span>
+    <input name="password" type="password" autocomplete="current-password" required maxlength="128"></label>
+  <button class="btn btn-primary btn-block" type="submit">登录控制台 {{template "spinner"}}</button>
+  <p class="small muted">这里不接受 SSO 用户账号。管理员账号由已有管理员创建，或在服务器上用 <code class="mono">moon-sso admin create</code> 创建。</p>
+</form>
+{{end}}

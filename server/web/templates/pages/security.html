@@ -1,0 +1,95 @@
+{{define "content"}}
+<div class="page-head">
+  <h1>账号安全</h1>
+  <p class="muted">管理密码、两步验证和已登录的设备</p>
+</div>
+<div class="grid-2">
+  <section class="card">
+    <h2>修改密码</h2>
+    {{template "password_form" .}}
+  </section>
+  <section class="card">
+    <h2>两步验证</h2>
+    {{template "totp_section" .}}
+  </section>
+</div>
+<section class="card">
+  <h2>登录设备</h2>
+  {{template "sessions_section" .}}
+</section>
+{{end}}
+
+{{define "password_form"}}
+<form method="post" action="/account/password" hx-post="/account/password" hx-target="this" hx-swap="outerHTML" hx-disabled-elt="find button" class="form">
+  {{template "csrf" .}}
+  {{template "alerts" .}}
+  <label class="field"><span>当前密码</span><input name="current_password" type="password" autocomplete="current-password" required maxlength="128"></label>
+  {{template "ferr" dict "Errors" .Errors "Field" "current_password"}}
+  <label class="field"><span>新密码</span><input name="password" type="password" autocomplete="new-password" required minlength="{{.Site.PasswordMinLength}}" maxlength="128"></label>
+  {{template "ferr" dict "Errors" .Errors "Field" "password"}}
+  <label class="field"><span>确认新密码</span><input name="password_confirm" type="password" autocomplete="new-password" required maxlength="128"></label>
+  {{template "ferr" dict "Errors" .Errors "Field" "password_confirm"}}
+  <p class="small muted">修改后，除当前设备外的所有登录都会退出，接入的应用也会收到通知。</p>
+  <button class="btn btn-primary" type="submit">修改密码 {{template "spinner"}}</button>
+</form>
+{{end}}
+
+{{define "totp_section"}}
+<div id="totp-section">
+  {{template "alerts" .}}
+  {{if .User.HasTOTP}}
+    <p><span class="badge badge-ok">已开启</span> 登录时需要输入身份验证器上的 6 位验证码。</p>
+    <form method="post" action="/account/totp/disable" hx-post="/account/totp/disable" hx-target="#totp-section" hx-swap="outerHTML" class="form">
+      {{template "csrf" .}}
+      <label class="field"><span>输入密码以关闭</span><input name="password" type="password" autocomplete="current-password" required></label>
+      {{template "ferr" dict "Errors" .Errors "Field" "totp_password"}}
+      <button class="btn btn-danger btn-sm" type="submit">关闭两步验证</button>
+    </form>
+  {{else if .Data.TOTPSetup}}
+    <ol class="steps">
+      <li>用 Google Authenticator、Microsoft Authenticator 或 1Password 等 App 扫描二维码：
+        <div class="qr"><img src="{{.Data.TOTPQR}}" alt="两步验证二维码" width="180" height="180"></div>
+        <p class="small muted">无法扫码？手动输入密钥：<code class="mono">{{.Data.TOTPSecret}}</code></p>
+      </li>
+      <li>输入 App 上显示的 6 位验证码完成绑定：
+        <form method="post" action="/account/totp/confirm" hx-post="/account/totp/confirm" hx-target="#totp-section" hx-swap="outerHTML" class="form row">
+          {{template "csrf" .}}
+          <input name="code" inputmode="numeric" maxlength="7" autocomplete="one-time-code" required class="otp" aria-label="验证码">
+          <button class="btn btn-primary" type="submit">确认绑定</button>
+        </form>
+        {{template "ferr" dict "Errors" .Errors "Field" "code"}}
+      </li>
+    </ol>
+  {{else}}
+    <p>开启后，登录时除了密码还需要输入手机上的动态验证码，即使密码泄露账号也不会被盗。</p>
+    <form method="post" action="/account/totp/setup" hx-post="/account/totp/setup" hx-target="#totp-section" hx-swap="outerHTML">
+      {{template "csrf" .}}
+      <button class="btn btn-primary" type="submit">开启两步验证</button>
+    </form>
+  {{end}}
+</div>
+{{end}}
+
+{{define "sessions_section"}}
+<div id="sessions-section">
+  {{if .Flash}}<div class="alert alert-ok" role="status">{{.Flash}}</div>{{end}}
+  <ul class="list">
+  {{$cur := .Session.SID}}{{$csrf := .CSRF}}
+  {{range .Data.Sessions}}
+    <li class="list-item">
+      <div>
+        <div><strong>{{.UserAgent | uaSummary}}</strong>{{if eq .SID $cur}} <span class="badge badge-ok">当前设备</span>{{end}}</div>
+        <div class="small muted">{{.IP}} · 登录于 {{fmtTime .CreatedAt}} · 最近活动 {{ago .LastSeenAt}}{{if contains .AMR "otp"}} · 已两步验证{{end}}</div>
+      </div>
+      <form method="post" action="/account/sessions/revoke" hx-post="/account/sessions/revoke" hx-target="#sessions-section" hx-swap="outerHTML" hx-confirm="确定让这台设备退出登录吗？">
+        <input type="hidden" name="_csrf" value="{{$csrf}}">
+        <input type="hidden" name="sid" value="{{.SID}}">
+        <button class="btn btn-ghost btn-sm" type="submit">{{if eq .SID $cur}}退出{{else}}移除{{end}}</button>
+      </form>
+    </li>
+  {{else}}
+    <li class="muted">没有其他登录设备</li>
+  {{end}}
+  </ul>
+</div>
+{{end}}

@@ -1,0 +1,35 @@
+{{define "audit_rows"}}
+<div class="table-wrap">
+<table>
+  <thead><tr><th>时间</th><th>操作</th><th>对象</th><th>操作者</th><th>IP</th><th>详情</th></tr></thead>
+  <tbody>
+  {{range .}}
+    <tr>
+      <td class="small nowrap">{{fmtTime .At}}</td>
+      <td class="mono small">{{.Action}}</td>
+      <td class="small">{{if eq .TargetType "user"}}<a href="/users/{{.TargetID}}">{{.TargetID}}</a>{{else if eq .TargetType "client"}}<a href="/clients/{{.TargetID}}">{{.TargetID}}</a>{{else}}{{.TargetType}} {{.TargetID}}{{end}}</td>
+      <td class="small">{{with .ActorAdmin}}<span class="badge badge-admin">@{{.}}</span>{{end}}{{with .ActorClientID}}<span class="mono">{{.}}</span>{{end}}{{if and (not .ActorAdmin) (not .ActorClientID) .ActorUserID}}<span class="muted">用户</span>{{end}}</td>
+      <td class="small mono">{{.IP}}</td>
+      <td class="small muted">{{range $k, $v := .Meta}}{{$k}}={{$v}} {{end}}</td>
+    </tr>
+  {{else}}
+    <tr><td colspan="6" class="muted">暂无记录</td></tr>
+  {{end}}
+  </tbody>
+</table>
+</div>
+{{end}}
+
+{{define "status_badge"}}{{if eq . 1}}<span class="badge badge-ok">正常</span>{{else}}<span class="badge badge-err">已停用</span>{{end}}{{end}}
+
+{{define "client_status"}}{{if eq . 1}}<span class="badge badge-ok">已启用</span>{{else if eq . 2}}<span class="badge badge-warn">待审核</span>{{else}}<span class="badge badge-err">已停用</span>{{end}}{{end}}
+
+{{define "once_secrets"}}
+{{with .}}
+<dl class="kv once">
+  {{with .ClientSecret}}<dt>Client Secret</dt><dd><div class="secret-once"><span id="s-csec">{{.}}</span><button class="btn btn-ghost btn-sm" type="button" data-copy="s-csec">复制</button></div></dd>{{end}}
+  {{with .WebhookSecret}}<dt>Webhook 密钥</dt><dd><div class="secret-once"><span id="s-wh">{{.}}</span><button class="btn btn-ghost btn-sm" type="button" data-copy="s-wh">复制</button></div></dd>{{end}}
+  {{with .RegistrationToken}}<dt>注册管理令牌</dt><dd><div class="secret-once"><span id="s-rat">{{.}}</span><button class="btn btn-ghost btn-sm" type="button" data-copy="s-rat">复制</button></div></dd>{{end}}
+</dl>
+{{end}}
+{{end}}

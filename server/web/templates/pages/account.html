@@ -1,0 +1,61 @@
+{{define "content"}}
+<div class="page-head">
+  <h1>个人资料</h1>
+  <p class="muted">这里的修改会实时同步到你授权过的所有应用</p>
+</div>
+<div class="grid-2">
+  <section class="card">
+    <h2>头像</h2>
+    {{template "avatar_section" .}}
+  </section>
+  <section class="card">
+    <h2>基本信息</h2>
+    {{template "profile_form" .}}
+  </section>
+</div>
+<section class="card">
+  <h2>账号标识</h2>
+  <dl class="kv">
+    <dt>注册时间</dt><dd>{{fmtTime .User.CreatedAt}}</dd>
+    <dt>资料版本</dt><dd>v{{.User.ProfileVersion}}</dd>
+    <dt>两步验证</dt><dd>{{if .User.HasTOTP}}<span class="badge badge-ok">已开启</span>{{else}}<span class="badge">未开启</span> <a href="/account/security">去开启</a>{{end}}</dd>
+  </dl>
+</section>
+{{end}}
+
+{{define "avatar_section"}}
+<div id="avatar-section" class="avatar-edit">
+  {{template "avatar" dict "User" .User "Size" "lg"}}
+  <form method="post" action="/account/avatar" enctype="multipart/form-data" hx-post="/account/avatar" hx-encoding="multipart/form-data" hx-target="#avatar-section" hx-swap="outerHTML" hx-disabled-elt="find button" class="form">
+    {{template "csrf" .}}
+    {{with .Data.AvatarError}}<p class="ferr">{{.}}</p>{{end}}
+    {{with .Data.AvatarFlash}}<p class="ok-text">{{.}}</p>{{end}}
+    <input type="file" name="avatar" accept="image/png,image/jpeg,image/gif,image/webp" required>
+    <small>支持 PNG / JPEG / GIF / WebP，最大 5 MB，会自动裁剪为正方形</small>
+    <div class="row">
+      <button class="btn btn-primary btn-sm" type="submit">上传头像 {{template "spinner"}}</button>
+      {{if .User.AvatarKey}}<button class="btn btn-ghost btn-sm" type="submit" name="remove" value="1" formnovalidate hx-post="/account/avatar" hx-vals='{"remove":"1"}'>移除</button>{{end}}
+    </div>
+  </form>
+</div>
+{{end}}
+
+{{define "profile_form"}}
+<form method="post" action="/account/profile" hx-post="/account/profile" hx-target="this" hx-swap="outerHTML" hx-disabled-elt="find button" class="form">
+  {{template "csrf" .}}
+  {{if .Flash}}<div class="alert alert-ok" role="status">{{.Flash}}</div>{{end}}
+  {{if .Error}}<div class="alert alert-err" role="alert">{{.Error}}</div>{{end}}
+  <label class="field">
+    <span>用户名</span>
+    <input name="username" value="{{.Form.username}}" autocapitalize="none" spellcheck="false" required minlength="3" maxlength="32">
+    <small>用于登录。修改后旧用户名会保留 {{.Site.UsernameReserveDays}} 天，{{.Site.UsernameCooldownDays}} 天内只能改一次</small>
+  </label>
+  {{template "ferr" dict "Errors" .Errors "Field" "username"}}
+  <label class="field">
+    <span>昵称</span>
+    <input name="display_name" value="{{.Form.display_name}}" maxlength="32" placeholder="在应用中显示的名字">
+  </label>
+  {{template "ferr" dict "Errors" .Errors "Field" "display_name"}}
+  <button class="btn btn-primary" type="submit">保存 {{template "spinner"}}</button>
+</form>
+{{end}}

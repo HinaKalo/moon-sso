@@ -1,0 +1,117 @@
+{{define "content"}}
+{{$a := .Data.App}}{{$f := .Data.Flags}}
+<div class="page-head">
+  <p class="small"><a href="/clients">← 应用</a></p>
+  <h1>{{if $a}}{{$a.Name}} {{template "client_status" $a.Status}}{{else}}创建应用{{end}}</h1>
+  {{with $a}}<p class="muted small"><span class="mono">{{.ID}}</span>{{with $.Data.Owner}} · 开发者 <a href="/users/{{.PublicSub}}">{{.Username}}</a>{{end}} · {{$.Data.GrantCount}} 位用户授权</p>{{end}}
+</div>
+{{template "alerts" .}}
+{{template "once_secrets" .Data.Creds}}
+
+{{with $a}}
+<section class="card">
+  <h2>状态与凭证</h2>
+  <div class="actions">
+    {{$csrf := $.CSRF}}
+    {{if eq .Status 2}}<form method="post" action="/clients/{{.ID}}/action"><input type="hidden" name="_csrf" value="{{$csrf}}"><button class="btn btn-primary btn-sm" name="action" value="approve">审核通过</button></form>{{end}}
+    {{if eq .Status 1}}<form method="post" action="/clients/{{.ID}}/action" hx-confirm="停用后该应用所有用户的刷新令牌立即失效，确定吗？"><input type="hidden" name="_csrf" value="{{$csrf}}"><button class="btn btn-ghost btn-sm" name="action" value="disable">停用</button></form>{{end}}
+    {{if eq .Status 3}}<form method="post" action="/clients/{{.ID}}/action"><input type="hidden" name="_csrf" value="{{$csrf}}"><button class="btn btn-primary btn-sm" name="action" value="enable">启用</button></form>{{end}}
+    {{if not .IsPublic}}<form method="post" action="/clients/{{.ID}}/action" hx-confirm="旧密钥立即失效，确定轮换吗？"><input type="hidden" name="_csrf" value="{{$csrf}}"><button class="btn btn-ghost btn-sm" name="action" value="rotate_secret">轮换 Client Secret</button></form>{{end}}
+    {{if .WebhookURL}}
+      <form method="post" action="/clients/{{.ID}}/action"><input type="hidden" name="_csrf" value="{{$csrf}}"><button class="btn btn-ghost btn-sm" name="action" value="rotate_webhook_secret">轮换 Webhook 密钥</button></form>
+      <form hx-post="/clients/{{.ID}}/action" hx-target="#wh-result" hx-vals='{"action":"webhook_test"}'><input type="hidden" name="_csrf" value="{{$csrf}}"><button class="btn btn-ghost btn-sm" type="submit">发送测试事件</button></form>
+      {{if .WebhookDisabledAt}}<form method="post" action="/clients/{{.ID}}/action"><input type="hidden" name="_csrf" value="{{$csrf}}"><button class="btn btn-primary btn-sm" name="action" value="webhook_enable">重新启用 Webhook</button></form>{{end}}
+    {{end}}
+  </div>
+  <div id="wh-result" class="gap-top"></div>
+  {{if .WebhookURL}}
+  <dl class="kv gap-top">
+    <dt>Webhook 游标</dt><dd>seq {{.WebhookCursorSeq}}</dd>
+    <dt>Webhook 状态</dt><dd>{{if .WebhookDisabledAt}}<span class="badge badge-err">已停用</span>{{else if .WebhookLastError}}<span class="badge badge-warn">第 {{.WebhookAttempts}} 次重试，下次 {{fmtTime .WebhookNextAttemptAt}}</span>{{else}}<span class="badge badge-ok">正常</span>{{end}} <span class="small muted">{{.WebhookLastError}}</span></dd>
+  </dl>
+  {{end}}
+  {{with $.Data.Dead}}
+  <h3 class="gap-top">死信（{{len .}}）</h3>
+  <ul class="list">{{range .}}<li class="list-item"><span class="small">seq {{.Seq}} · {{.Attempts}} 次 · {{.LastError}} · {{fmtTime .CreatedAt}}</span>
+    <form hx-post="/webhooks/redrive" hx-target="this" hx-swap="outerHTML"><input type="hidden" name="_csrf" value="{{$.CSRF}}"><input type="hidden" name="id" value="{{.ID}}"><button class="btn btn-ghost btn-sm" type="submit">重投</button></form></li>{{end}}</ul>
+  {{end}}
+</section>
+{{end}}
+
+<form method="post" action="{{if $a}}/clients/{{$a.ID}}{{else}}/clients/new{{end}}" class="form">
+  {{template "csrf" .}}
+  <section class="card">
+    <h2>基本信息</h2>
+    <div class="form">
+      <label class="field"><span>应用名称</span><input name="name" value="{{.Form.name}}" required maxlength="60"></label>
+      {{template "ferr" dict "Errors" .Errors "Field" "name"}}
+      <label class="field"><span>简介</span><textarea name="description" rows="2" maxlength="300">{{.Form.description}}</textarea></label>
+      <fieldset class="field plain" {{if $a}}disabled{{end}}>
+        <span>应用类型</span>
+        {{$k := .Form.kind}}
+        {{range .Data.Kinds}}<label class="check"><input type="radio" name="kind" value="{{.ID}}" {{if eq $k .ID}}checked{{end}}><span><strong>{{.Name}}</strong> <small class="muted">{{.Help}}</small></span></label>{{end}}
+      </fieldset>
+      {{if $a}}<input type="hidden" name="kind" value="{{.Form.kind}}">{{end}}
+    </div>
+  </section>
+  <section class="card">
+    <h2>管理员标记</h2>
+    <div class="form">
+      <label class="check"><input type="checkbox" name="first_party" value="1" {{if $f.FirstParty}}checked{{end}}><span><strong>第一方应用</strong> — 自家应用，授权页显示“官方应用”</span></label>
+      <label class="check"><input type="checkbox" name="native_login" value="1" {{if $f.NativeLogin}}checked{{end}}><span><strong>允许应用内登录/注册</strong> — 应用可直接收集用户名和密码（仅对第一方应用生效）</span></label>
+      <label class="check"><input type="checkbox" name="skip_consent" value="1" {{if $f.SkipConsent}}checked{{end}}><span><strong>跳过授权确认</strong> — 不显示同意页</span></label>
+      <label class="check"><input type="checkbox" name="verified" value="1" {{if $f.Verified}}checked{{end}}><span><strong>已验证</strong> — 授权页不显示“未验证”警告</span></label>
+      <label class="check"><input type="checkbox" name="allow_registration" value="1" {{if $f.AllowRegistration}}checked{{end}}><span><strong>允许通过该应用注册新用户</strong>（仍受全局开关控制）</span></label>
+      <label class="check"><input type="checkbox" name="require_otp" value="1" {{if eq $f.RequireAMR "otp"}}checked{{end}}><span><strong>要求两步验证</strong> — 用户必须完成 TOTP 才能登录此应用</span></label>
+      <label class="check"><input type="checkbox" name="webhook_allow_insecure" value="1" {{if $f.WebhookAllowInsecure}}checked{{end}}><span><strong>允许 http/内网回调地址</strong> — 仅用于同一主机上的可信应用</span></label>
+      <label class="field"><span>Subject 类型</span>
+        <select name="subject_type"><option value="pairwise" {{if ne $f.SubjectType "public"}}selected{{end}}>pairwise（每个应用不同，保护隐私）</option><option value="public" {{if eq $f.SubjectType "public"}}selected{{end}}>public（所有应用相同，适合自家应用互通）</option></select>
+      </label>
+      <label class="field"><span>Access Token 有效期（分钟）<em>留空使用全局设置</em></span><input name="access_ttl" type="number" min="1" max="60" value="{{.Form.access_ttl}}"></label>
+    </div>
+  </section>
+  <section class="card">
+    <h2>回调地址</h2>
+    <div class="form">
+      <label class="field"><span>登录回调地址 <em>每行一个</em></span><textarea name="redirect_uris" rows="3" class="mono">{{.Form.redirect_uris}}</textarea></label>
+      {{template "ferr" dict "Errors" .Errors "Field" "redirect_uris"}}
+      <label class="field"><span>退出后回调地址</span><textarea name="post_logout_redirect_uris" rows="2" class="mono">{{.Form.post_logout_redirect_uris}}</textarea></label>
+      {{template "ferr" dict "Errors" .Errors "Field" "post_logout_redirect_uris"}}
+    </div>
+  </section>
+  <section class="card">
+    <h2>权限与同步</h2>
+    {{$sel := .Data.Selected}}{{$ev := .Data.SelectedEvents}}
+    <div class="form">
+      {{range .Data.Scopes}}<label class="check"><input type="checkbox" name="scopes" value="{{.Name}}" {{if has $sel .Name}}checked{{end}}><span><code class="mono">{{.Name}}</code> — {{.Description}}</span></label>{{end}}
+      {{template "ferr" dict "Errors" .Errors "Field" "scope"}}
+      <label class="check"><input type="checkbox" name="require_dpop" value="1" {{if eq .Form.require_dpop "1"}}checked{{end}}><span>要求 DPoP</span></label>
+      <label class="field"><span>ID Token 签名算法</span><select name="id_token_alg"><option value="RS256" {{if ne .Form.id_token_alg "ES256"}}selected{{end}}>RS256</option><option value="ES256" {{if eq .Form.id_token_alg "ES256"}}selected{{end}}>ES256</option></select></label>
+      <label class="field"><span>Webhook 地址</span><input name="webhook_url" value="{{.Form.webhook_url}}" class="mono"></label>
+      {{template "ferr" dict "Errors" .Errors "Field" "webhook_url"}}
+      <div class="field"><span>订阅事件 <em>都不选表示全部</em></span>{{range .Data.EventTypes}}<label class="check"><input type="checkbox" name="webhook_events" value="{{.}}" {{if has $ev .}}checked{{end}}><span class="mono small">{{.}}</span></label>{{end}}</div>
+      <label class="field"><span>后端登出通知地址</span><input name="backchannel_logout_uri" value="{{.Form.backchannel_logout_uri}}" class="mono"></label>
+      {{template "ferr" dict "Errors" .Errors "Field" "backchannel_logout_uri"}}
+      <label class="field"><span>Logo 地址</span><input name="logo_uri" value="{{.Form.logo_uri}}" class="mono"></label>
+      <label class="field"><span>主页</span><input name="client_uri" value="{{.Form.client_uri}}" class="mono"></label>
+      <label class="field"><span>隐私政策</span><input name="policy_uri" value="{{.Form.policy_uri}}" class="mono"></label>
+      <label class="field"><span>服务条款</span><input name="tos_uri" value="{{.Form.tos_uri}}" class="mono"></label>
+    </div>
+  </section>
+  <div class="row"><button class="btn btn-primary" type="submit">{{if $a}}保存{{else}}创建应用{{end}}</button><a class="btn btn-ghost" href="/clients">取消</a></div>
+</form>
+
+{{with $a}}
+<section class="card gap-top">
+  <details>
+    <summary>删除应用</summary>
+    <form method="post" action="/clients/{{.ID}}/action" class="form gap-top">
+      <input type="hidden" name="_csrf" value="{{$.CSRF}}">
+      <p class="small">删除后所有用户的授权立即失效且无法恢复。输入 Client ID <code class="mono">{{.ID}}</code> 确认：</p>
+      <input name="confirm" autocomplete="off" required class="mono">
+      <button class="btn btn-danger btn-sm" name="action" value="delete">永久删除</button>
+    </form>
+  </details>
+</section>
+{{end}}
+{{end}}

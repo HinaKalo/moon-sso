@@ -1,0 +1,46 @@
+{{define "content"}}
+<section class="card auth-card">
+  <h1>创建账号</h1>
+  {{if .Site.RegistrationOpen}}
+  <p class="muted">只需用户名和密码，一个账号通行所有接入的应用</p>
+  {{template "register_form" .}}
+  {{else}}
+  <div class="empty">
+    <p><strong>暂未开放注册</strong></p>
+    <p class="muted">管理员目前关闭了自助注册，如需账号请联系管理员。</p>
+  </div>
+  {{end}}
+  <p class="switch">已有账号？<a href="/login{{with .Form.next}}?next={{.}}{{end}}">去登录</a></p>
+</section>
+{{end}}
+
+{{define "register_form"}}
+<form method="post" action="/register" hx-post="/register" hx-target="this" hx-swap="outerHTML" hx-disabled-elt="find button" class="form">
+  {{template "csrf" .}}
+  <input type="hidden" name="next" value="{{.Form.next}}">
+  {{template "alerts" .}}
+  <label class="field">
+    <span>用户名</span>
+    <input name="username" value="{{.Form.username}}" autocomplete="username" autocapitalize="none" spellcheck="false" required minlength="3" maxlength="32" pattern="[A-Za-z0-9][A-Za-z0-9_.\-]{1,30}[A-Za-z0-9]">
+    <small>3–32 位字母、数字或 _ . -，之后可以修改</small>
+  </label>
+  {{template "ferr" dict "Errors" .Errors "Field" "username"}}
+  <label class="field">
+    <span>昵称 <em>可选</em></span>
+    <input name="display_name" value="{{.Form.display_name}}" maxlength="32">
+  </label>
+  {{template "ferr" dict "Errors" .Errors "Field" "display_name"}}
+  <label class="field">
+    <span>密码</span>
+    <input name="password" type="password" autocomplete="new-password" required minlength="{{.Site.PasswordMinLength}}" maxlength="128">
+    <small>至少 {{.Site.PasswordMinLength}} 位，避免使用常见密码</small>
+  </label>
+  {{template "ferr" dict "Errors" .Errors "Field" "password"}}
+  <label class="field">
+    <span>确认密码</span>
+    <input name="password_confirm" type="password" autocomplete="new-password" required maxlength="128">
+  </label>
+  {{template "ferr" dict "Errors" .Errors "Field" "password_confirm"}}
+  <button class="btn btn-primary btn-block" type="submit">注册 {{template "spinner"}}</button>
+</form>
+{{end}}

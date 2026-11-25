@@ -1,0 +1,15 @@
+{{define "content"}}
+<section class="card auth-card">
+  <h1>选择账号</h1>
+  <p class="muted">继续登录「{{.Data.Client.Name}}」</p>
+  <a class="list-item" href="{{.Data.Continue}}">
+    <span class="row">{{template "avatar" dict "User" .User "Size" "md"}}<span><strong>{{.User.Name}}</strong><br><span class="small muted">{{.User.Username}}</span></span></span>
+    <span class="btn btn-primary btn-sm">继续</span>
+  </a>
+  <form method="post" action="/oauth/switch-account">
+    {{template "csrf" .}}
+    <input type="hidden" name="next" value="{{.Data.Continue}}">
+    <button class="btn btn-ghost btn-block" type="submit">使用其他账号</button>
+  </form>
+</section>
+{{end}}

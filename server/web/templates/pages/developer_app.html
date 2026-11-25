@@ -1,0 +1,94 @@
+{{define "content"}}
+{{$a := .Data.App}}
+<div class="page-head">
+  <p class="small"><a href="/developer">← 开发者中心</a></p>
+  <h1>{{if $a}}{{$a.Name}}{{else}}创建应用{{end}}</h1>
+  {{with $a}}<p class="muted mono small">{{.ID}} · {{if eq .Status 1}}已启用{{else if eq .Status 2}}待审核{{else}}已停用{{end}}</p>{{end}}
+</div>
+{{template "alerts" .}}
+<form method="post" action="{{if $a}}/developer/apps/{{$a.ID}}{{else}}/developer/apps{{end}}" class="form">
+  {{template "csrf" .}}
+  <section class="card">
+    <h2>基本信息</h2>
+    <div class="form">
+      <label class="field"><span>应用名称</span><input name="name" value="{{.Form.name}}" required maxlength="60"></label>
+      {{template "ferr" dict "Errors" .Errors "Field" "name"}}
+      <label class="field"><span>简介 <em>可选，显示在授权页</em></span><textarea name="description" rows="2" maxlength="300">{{.Form.description}}</textarea></label>
+      <fieldset class="field plain" {{if $a}}disabled{{end}}>
+        <span>应用类型{{if $a}} <em>创建后不可修改</em>{{end}}</span>
+        {{$k := .Form.kind}}
+        {{range .Data.Kinds}}<label class="check"><input type="radio" name="kind" value="{{.ID}}" {{if eq $k .ID}}checked{{end}}><span><strong>{{.Name}}</strong><br><small class="muted">{{.Help}}</small></span></label>{{end}}
+      </fieldset>
+      {{if $a}}<input type="hidden" name="kind" value="{{.Form.kind}}">{{end}}
+    </div>
+  </section>
+  <section class="card">
+    <h2>回调地址</h2>
+    <div class="form">
+      <label class="field"><span>登录回调地址 <em>每行一个</em></span><textarea name="redirect_uris" rows="3" class="mono" placeholder="https://myapp.example/callback">{{.Form.redirect_uris}}</textarea>
+      <small>Web 应用使用 https；桌面应用使用 http://127.0.0.1/callback（端口任意）；Android 使用反向域名的自定义 scheme（如 com.example.app:/oauth2redirect）或 App Link。</small></label>
+      {{template "ferr" dict "Errors" .Errors "Field" "redirect_uris"}}
+      <label class="field"><span>退出后回调地址 <em>可选，每行一个</em></span><textarea name="post_logout_redirect_uris" rows="2" class="mono">{{.Form.post_logout_redirect_uris}}</textarea></label>
+      {{template "ferr" dict "Errors" .Errors "Field" "post_logout_redirect_uris"}}
+    </div>
+  </section>
+  <section class="card">
+    <h2>权限范围</h2>
+    {{$sel := .Data.Selected}}
+    <div class="form">
+    {{range .Data.Scopes}}<label class="check"><input type="checkbox" name="scopes" value="{{.Name}}" {{if has $sel .Name}}checked{{end}}><span><code class="mono">{{.Name}}</code> — {{.Description}}</span></label>{{end}}
+    {{template "ferr" dict "Errors" .Errors "Field" "scope"}}
+    <label class="check"><input type="checkbox" name="require_dpop" value="1" {{if eq .Form.require_dpop "1"}}checked{{end}}><span>要求 DPoP（推荐用于浏览器单页应用和原生应用，SDK 会自动处理）</span></label>
+    <label class="field"><span>ID Token 签名算法</span>
+      <select name="id_token_alg"><option value="RS256" {{if ne .Form.id_token_alg "ES256"}}selected{{end}}>RS256（兼容性最好）</option><option value="ES256" {{if eq .Form.id_token_alg "ES256"}}selected{{end}}>ES256</option></select>
+    </label>
+    </div>
+  </section>
+  <section class="card">
+    <h2>资料同步</h2>
+    <p class="small muted">用户在任何应用中修改用户名、昵称、头像或密码后，{{.Site.SiteName}} 会通过签名的 Webhook（Standard Webhooks 格式）通知你的服务器。</p>
+    <div class="form">
+      <label class="field"><span>Webhook 地址 <em>可选，必须是 https</em></span><input name="webhook_url" value="{{.Form.webhook_url}}" class="mono" placeholder="https://myapp.example/hooks/sso"></label>
+      {{template "ferr" dict "Errors" .Errors "Field" "webhook_url"}}
+      {{$ev := .Data.SelectedEvents}}
+      <div class="field"><span>订阅事件 <em>都不选表示全部</em></span>
+      {{range .Data.EventTypes}}<label class="check"><input type="checkbox" name="webhook_events" value="{{.}}" {{if has $ev .}}checked{{end}}><span class="mono small">{{.}}</span></label>{{end}}
+      </div>
+      <label class="field"><span>后端登出通知地址 <em>可选，OIDC Back-Channel Logout</em></span><input name="backchannel_logout_uri" value="{{.Form.backchannel_logout_uri}}" class="mono"></label>
+      {{template "ferr" dict "Errors" .Errors "Field" "backchannel_logout_uri"}}
+    </div>
+  </section>
+  <section class="card">
+    <h2>展示信息 <span class="small muted">可选</span></h2>
+    <div class="form">
+      <label class="field"><span>Logo 地址</span><input name="logo_uri" value="{{.Form.logo_uri}}" class="mono"></label>
+      {{template "ferr" dict "Errors" .Errors "Field" "logo_uri"}}
+      <label class="field"><span>主页</span><input name="client_uri" value="{{.Form.client_uri}}" class="mono"></label>
+      <label class="field"><span>隐私政策</span><input name="policy_uri" value="{{.Form.policy_uri}}" class="mono"></label>
+      <label class="field"><span>服务条款</span><input name="tos_uri" value="{{.Form.tos_uri}}" class="mono"></label>
+    </div>
+  </section>
+  <div class="row"><button class="btn btn-primary" type="submit">{{if $a}}保存{{else}}创建应用{{end}}</button><a class="btn btn-ghost" href="/developer">取消</a></div>
+</form>
+
+{{with $a}}
+<section class="card gap-top">
+  <h2>凭证与维护</h2>
+  <dl class="kv">
+    <dt>Issuer</dt><dd class="mono">{{$.Data.Issuer}}</dd>
+    <dt>Client ID</dt><dd class="mono">{{.ID}}</dd>
+    {{if not .IsPublic}}<dt>Client Secret</dt><dd>已设置{{with .SecretRotatedAt}}（{{fmtTime .}} 生成）{{end}}</dd>{{end}}
+    {{if .WebhookURL}}<dt>Webhook 状态</dt><dd>{{if .WebhookDisabledAt}}<span class="badge badge-err">已停用</span> {{.WebhookLastError}}{{else if .WebhookLastError}}<span class="badge badge-warn">重试中</span> {{.WebhookLastError}}{{else}}<span class="badge badge-ok">正常</span>{{end}}</dd>{{end}}
+  </dl>
+  <div class="row gap-top">
+    {{if not .IsPublic}}<form method="post" action="/developer/apps/{{.ID}}/secret"><input type="hidden" name="_csrf" value="{{$.CSRF}}"><button class="btn btn-ghost btn-sm" type="submit">轮换 Client Secret</button></form>{{end}}
+    {{if .WebhookURL}}
+    <form method="post" action="/developer/apps/{{.ID}}/webhook-secret"><input type="hidden" name="_csrf" value="{{$.CSRF}}"><button class="btn btn-ghost btn-sm" type="submit">轮换 Webhook 密钥</button></form>
+    <form hx-post="/developer/apps/{{.ID}}/webhook-test" hx-target="#webhook-result"><input type="hidden" name="_csrf" value="{{$.CSRF}}"><button class="btn btn-ghost btn-sm" type="submit">发送测试事件</button></form>
+    {{end}}
+    <form method="post" action="/developer/apps/{{.ID}}/delete" hx-post="/developer/apps/{{.ID}}/delete" hx-confirm="删除后所有用户的授权都会失效，且无法恢复。确定删除吗？"><input type="hidden" name="_csrf" value="{{$.CSRF}}"><button class="btn btn-danger btn-sm" type="submit">删除应用</button></form>
+  </div>
+  <div id="webhook-result" class="gap-top"></div>
+</section>
+{{end}}
+{{end}}

@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFrameworks>net8.0;net10.0</TargetFrameworks>
+    <RootNamespace>MoonSso.Desktop</RootNamespace>
+    <AssemblyName>MoonSso.Desktop</AssemblyName>
+    <PackageId>MoonSso.Desktop</PackageId>
+    <Description>Moon SSO desktop integration: system-browser login with loopback redirect, OS secure token storage (Windows DPAPI, macOS Keychain, Linux Secret Service) and cross-process refresh locking. Works with WPF, WinForms, Avalonia and console apps.</Description>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <NoWarn>$(NoWarn);CS1591;CS1573</NoWarn>
+    <IsPackable>true</IsPackable>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\MoonSso.Client\MoonSso.Client.csproj" />
+    <PackageReference Include="System.Security.Cryptography.ProtectedData" Version="10.0.0" />
+    <InternalsVisibleTo Include="MoonSso.Tests" />
+    <None Include="..\..\README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
+</Project>

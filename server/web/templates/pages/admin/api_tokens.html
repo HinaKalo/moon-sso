@@ -1,0 +1,106 @@
+{{define "content"}}
+<div class="page-head">
+  <h1>API 令牌</h1>
+  <p class="muted">控制台令牌（<code class="mono">msso_adm_…</code>）只能调用 <code class="mono">{{.Data.AdminAPI}}</code>，以你的身份执行操作并记入审计日志。创建需要身份验证器验证码；令牌只显示一次，最长有效 90 天。接口定义见 <a href="/openapi.yaml">OpenAPI 规范</a>，命令行用法见 <a href="{{.Data.DocsURL}}">接入文档</a>。</p>
+</div>
+{{template "alerts" .}}
+{{with .Data.NewToken}}
+<section class="card">
+  <p class="small"><strong>新令牌只显示这一次</strong>，请立即复制并妥善保存：</p>
+  <div class="secret-once"><span id="new-api-token">{{.}}</span><button class="btn btn-ghost btn-sm" type="button" data-copy="new-api-token">复制</button></div>
+  <pre class="mono small code-block"># 命令行工具（与开发者令牌分开保存在 admin 配置中）
+moonsso login --with-token &lt;&lt;&lt; '{{.}}'
+moonsso admin stats
+
+# 或直接用 curl
+export MOONSSO_ADMIN_TOKEN='{{.}}'
+curl -H "Authorization: Bearer $MOONSSO_ADMIN_TOKEN" {{$.Data.AdminAPI}}/users?q=alice</pre>
+</section>
+{{end}}
+
+<section class="card gap-top">
+  <h2>我的控制台令牌</h2>
+  {{template "console_token_table" dict "Tokens" .Data.Mine "CSRF" .CSRF "Grace" .Data.GraceChoices "Own" true}}
+  <details class="gap-top" {{if .Error}}open{{end}}>
+    <summary class="btn btn-primary">创建控制台令牌</summary>
+    <form method="post" action="/api-tokens" class="form gap-top narrow-left">
+      {{template "csrf" .}}
+      <label class="field"><span>名称</span><input name="name" value="{{.Form.name}}" required maxlength="64" placeholder="例如：运维脚本、值班笔记本"></label>
+      {{template "ferr" dict "Errors" .Errors "Field" "name"}}
+      <fieldset class="field"><legend>权限</legend>
+        {{$sel := .Data.SelectedTokenScopes}}
+        {{range .Data.TokenScopes}}<label class="check"><input type="checkbox" name="scopes" value="{{.Name}}" {{if has $sel .Name}}checked{{end}}><span><code class="mono">{{.Name}}</code> — {{.Label}}</span></label>{{end}}
+        <p class="small muted">按需授予最小权限；write 包含对应的 read。令牌不能管理控制台管理员，也不能创建新令牌。</p>
+      </fieldset>
+      {{template "ferr" dict "Errors" .Errors "Field" "scopes"}}
+      <label class="field"><span>有效期</span>
+        <select name="days">{{$d := .Form.days}}{{range .Data.TokenLifetimes}}<option value="{{.}}" {{if eq (printf "%d" .) $d}}selected{{end}}>{{.}} 天</option>{{end}}</select>
+      </label>
+      {{template "ferr" dict "Errors" .Errors "Field" "expires_in_days"}}
+      <label class="field"><span>IP 白名单 <em>强烈建议</em></span><input name="allowed_ips" value="{{.Form.allowed_ips}}" placeholder="203.0.113.7, 198.51.100.0/24" spellcheck="false"></label>
+      {{template "ferr" dict "Errors" .Errors "Field" "allowed_ips"}}
+      <label class="field"><span>身份验证器验证码</span><input name="code" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6}" maxlength="6" required></label>
+      {{template "ferr" dict "Errors" .Errors "Field" "code"}}
+      <button class="btn btn-primary" type="submit">创建</button>
+    </form>
+  </details>
+</section>
+
+<section class="card">
+  <h2>其他管理员的控制台令牌</h2>
+  <p class="small muted">只能吊销，不能轮换或查看令牌内容。</p>
+  {{template "console_token_table" dict "Tokens" .Data.Others "CSRF" .CSRF "Grace" .Data.GraceChoices "Own" false}}
+</section>
+
+<section class="card">
+  <div class="row spread">
+    <h2>开发者令牌</h2>
+    <form method="get" action="/api-tokens" class="inline-form">
+      <input type="search" name="user" value="{{.Form.user}}" placeholder="按用户名筛选" aria-label="按用户名筛选">
+      <button class="btn btn-ghost btn-sm" type="submit">筛选</button>
+    </form>
+  </div>
+  <p class="small muted">SSO 用户在开发者中心创建的有效令牌（<code class="mono">msso_dev_…</code>）。发现泄露时可在此直接吊销。</p>
+  {{template "console_token_table" dict "Tokens" .Data.Developer "CSRF" .CSRF "Grace" .Data.GraceChoices "Own" false}}
+</section>
+{{end}}
+
+{{define "console_token_table"}}
+<div class="table-wrap">
+<table>
+  <thead><tr><th>名称</th>{{if not .Own}}<th>所有者</th>{{end}}<th>权限</th><th>状态</th><th>到期</th><th>最近使用</th><th></th></tr></thead>
+  <tbody>
+  {{$csrf := .CSRF}}{{$grace := .Grace}}{{$own := .Own}}
+  {{range .Tokens}}
+    <tr>
+      <td><strong>{{.Name}}</strong><br><span class="mono small muted">{{.Hint}}</span>{{if .AllowedIPs}}<br><span class="small muted">仅限 {{join .AllowedIPs ", "}}</span>{{end}}</td>
+      {{if not $own}}<td class="mono small">{{if eq .Kind "console"}}@{{end}}{{.Owner}}</td>{{end}}
+      <td>{{range .Scopes}}<span class="badge mono">{{.}}</span> {{end}}</td>
+      <td>{{template "api_token_status" .}}</td>
+      <td class="small nowrap">{{fmtTime .ExpiresAt}}</td>
+      <td class="small">{{if .LastUsedAt}}{{fmtTime .LastUsedAt}}<br><span class="mono muted">{{.LastUsedIP}}</span>{{else}}<span class="muted">从未</span>{{end}}</td>
+      <td>
+        {{if or (eq .Status "active") (eq .Status "rotating")}}
+        <div class="actions">
+          {{if and $own (eq .Status "active")}}
+          <form method="post" action="/api-tokens/{{.ID}}/rotate" class="inline-form">
+            <input type="hidden" name="_csrf" value="{{$csrf}}">
+            <select name="grace" aria-label="旧令牌宽限期">{{range $grace}}<option value="{{.Seconds}}" {{if eq .Seconds 3600}}selected{{end}}>旧令牌{{.Label}}{{if ne .Seconds 0}}后失效{{end}}</option>{{end}}</select>
+            <button class="btn btn-ghost btn-sm" type="submit">轮换</button>
+          </form>
+          {{end}}
+          <form method="post" action="/api-tokens/{{.ID}}/revoke">
+            <input type="hidden" name="_csrf" value="{{$csrf}}">
+            <button class="btn btn-danger btn-sm" type="submit">吊销</button>
+          </form>
+        </div>
+        {{end}}
+      </td>
+    </tr>
+  {{else}}
+    <tr><td colspan="7" class="muted">没有令牌。</td></tr>
+  {{end}}
+  </tbody>
+</table>
+</div>
+{{end}}

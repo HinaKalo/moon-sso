@@ -1,0 +1,41 @@
+{{define "content"}}
+<div class="page-head"><h1>总览</h1></div>
+<div class="stat-grid">
+  {{range .Data.Stats}}
+  <div class="stat">{{if .Link}}<a href="{{.Link}}" class="plain-link">{{end}}<div class="num">{{.Value}}</div><div class="lbl">{{.Label}}</div>{{if .Link}}</a>{{end}}</div>
+  {{end}}
+</div>
+<div class="grid-2">
+  <section class="card">
+    <h2>自助注册</h2>
+    {{template "reg_toggle" .}}
+  </section>
+  <section class="card">
+    <h2>本进程运行指标</h2>
+    {{$r := .Data.Runtime}}
+    <dl class="kv">
+      <dt>签发令牌</dt><dd>{{$r.tokens}}</dd>
+      <dt>其中刷新</dt><dd>{{$r.refresh}}（宽限期复用 {{$r.grace}} 次）</dd>
+      <dt>Webhook 已投递</dt><dd>{{$r.webhooks}}</dd>
+      <dt>实时连接（SSE）</dt><dd>{{$r.sse}}</dd>
+    </dl>
+    <p class="small muted">进程重启后清零；完整指标见本机 /metrics。</p>
+  </section>
+</div>
+<section class="card">
+  <div class="row spread"><h2>最近操作</h2><a class="small" href="/audit">全部 →</a></div>
+  {{template "audit_rows" .Data.Recent}}
+</section>
+{{end}}
+
+{{define "reg_toggle"}}
+<div id="reg-toggle">
+  {{$s := .Data.Set}}
+  <p>当前：{{if $s.RegistrationOpen}}<span class="badge badge-ok">开放注册</span> 任何人都可以用用户名和密码注册账号。{{else}}<span class="badge badge-err">关闭注册</span> 只有管理员可以创建账号。{{end}}</p>
+  <form hx-post="/settings/registration" hx-target="#reg-toggle" hx-swap="outerHTML" method="post" action="/settings/registration">
+    {{template "csrf" .}}
+    {{if $s.RegistrationOpen}}<input type="hidden" name="open" value="0"><button class="btn btn-danger" type="submit">关闭自助注册</button>
+    {{else}}<input type="hidden" name="open" value="1"><button class="btn btn-primary" type="submit">开放自助注册</button>{{end}}
+  </form>
+</div>
+{{end}}

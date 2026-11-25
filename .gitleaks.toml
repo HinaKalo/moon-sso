@@ -1,0 +1,13 @@
+# gitleaks 配置：在默认规则基础上，只放行已确认的测试向量（不按文件或目录整体豁免）
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Standard Webhooks 规范的公开测试向量、故意无效的 JWT 与测试服务器的固定值"
+regexTarget = "match"
+regexes = [
+  '''whsec_MfKQ9r8GKYqrTwjUPD8ILPZIo2LaLaSw''',
+  '''msg_p5jXN8AQM9LWM0D4loKWxJek''',
+  '''eyJhbGciOi[A-Za-z0-9_-]+\.e30\.(invalid)?''',
+  '''test-third-secret-0123456789abcd''',
+]

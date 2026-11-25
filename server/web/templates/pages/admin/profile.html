@@ -1,0 +1,37 @@
+{{define "content"}}
+<div class="page-head">
+  <h1>我的账号</h1>
+  <p class="muted"><span class="mono">@{{.Admin.Username}}</span> · 控制台会话空闲 30 分钟或满 12 小时后自动结束</p>
+</div>
+{{template "alerts" .}}
+<div class="grid-2 gap-top">
+  <section class="card">
+    <h2>修改密码</h2>
+    <form method="post" action="/profile/password" class="form">
+      {{template "csrf" .}}
+      <label class="field"><span>当前密码</span><input name="current_password" type="password" autocomplete="current-password" required></label>
+      {{template "ferr" dict "Errors" .Errors "Field" "current_password"}}
+      <label class="field"><span>新密码 <em>至少 12 位</em></span><input name="password" type="password" autocomplete="new-password" required minlength="12" maxlength="128"></label>
+      {{template "ferr" dict "Errors" .Errors "Field" "password"}}
+      <label class="field"><span>确认新密码</span><input name="password_confirm" type="password" autocomplete="new-password" required maxlength="128"></label>
+      {{template "ferr" dict "Errors" .Errors "Field" "password_confirm"}}
+      <button class="btn btn-primary" type="submit">修改密码</button>
+    </form>
+  </section>
+  <section class="card">
+    <h2>两步验证</h2>
+    <p><span class="badge badge-ok">已绑定</span> 控制台必须使用两步验证。</p>
+    <p class="small muted">更换手机时，请另一位管理员在“管理员”页面重置你的账号，或在服务器上执行 <code class="mono">moon-sso admin reset -username {{.Admin.Username}}</code>。</p>
+  </section>
+</div>
+<section class="card">
+  <h2>当前会话</h2>
+  <ul class="list">
+  {{$cur := .Data.Current}}
+  {{range .Data.Sessions}}
+    <li class="list-item"><div><strong>{{.UserAgent | uaSummary}}</strong>{{if eq (printf "%s" .ID) $cur}} <span class="badge badge-primary">当前</span>{{end}}
+      <div class="small muted mono">{{.IP}} · 登录于 {{fmtTime .CreatedAt}} · 最近活动 {{ago .LastSeenAt}}</div></div></li>
+  {{end}}
+  </ul>
+</section>
+{{end}}

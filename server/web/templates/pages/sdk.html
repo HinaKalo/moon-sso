@@ -1,0 +1,46 @@
+{{define "content"}}
+<div class="page-head">
+  <h1>SDK 下载</h1>
+  <p class="muted">所有 SDK 都遵循同一份行为规范：无感知续期、DPoP、应用内修改资料、实时同步。使用方法见 <a href="/docs">接入文档</a>。</p>
+</div>
+<section class="card">
+  <h2>Go</h2>
+  <pre class="mono small code-block">go get sso.moonl.cloud/sdk/go@latest</pre>
+  {{with .Data.GoVersions}}<p class="small muted">已发布版本：{{join . "、"}}</p>{{end}}
+</section>
+<section class="card" id="cli">
+  <h2>命令行工具 moonsso</h2>
+  <p>用 API 令牌在终端或 CI 中管理应用（开发者令牌）或整个 SSO（超级管理员令牌）。用法见 <a href="/docs#api-tokens">接入文档</a>。</p>
+  <pre class="mono small code-block">go install sso.moonl.cloud/sdk/go/cmd/moonsso@latest</pre>
+  {{with .Data.CLI}}
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>系统</th><th>架构</th><th>文件</th><th>大小</th></tr></thead>
+    <tbody>
+    {{range .}}<tr><td>{{if eq .OS "darwin"}}macOS{{else if eq .OS "windows"}}Windows{{else}}Linux{{end}}</td><td class="mono small">{{.Arch}}</td><td class="mono small"><a href="{{.URL}}" download>{{.Name}}</a></td><td class="small">{{.Size}} B</td></tr>{{end}}
+    </tbody>
+  </table>
+  </div>
+  <p class="small muted">校验和：<a class="mono" href="/sdk/cli/SHA256SUMS">SHA256SUMS</a>。macOS / Linux 下载后执行 <code class="mono">chmod +x</code>。</p>
+  {{end}}
+</section>
+<section class="card">
+  <h2>Maven 仓库（Android、Kotlin、Spring）</h2>
+  <pre class="mono small code-block">repositories { maven { url = uri("{{.Data.Issuer}}/sdk/maven") } }</pre>
+</section>
+<section class="card">
+  <h2>文件</h2>
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>类型</th><th>文件</th><th>大小</th><th>更新时间</th></tr></thead>
+    <tbody>
+    {{range .Data.Artifacts}}
+      <tr><td>{{.Kind}}</td><td class="mono small"><a href="{{.URL}}">{{.Name}}</a></td><td class="small">{{.Size}} B</td><td class="small">{{fmtTime .Modified}}</td></tr>
+    {{else}}
+      <tr><td colspan="4" class="muted">尚未发布</td></tr>
+    {{end}}
+    </tbody>
+  </table>
+  </div>
+</section>
+{{end}}

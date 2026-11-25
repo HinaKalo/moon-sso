@@ -1,0 +1,11 @@
+{{define "auth_form"}}
+<form method="post" action="/login/totp" hx-post="/login/totp" hx-target="this" hx-swap="outerHTML" hx-disabled-elt="find button" class="form">
+  {{template "csrf" .}}
+  {{template "alerts" .}}
+  <label class="field"><span>两步验证码</span>
+    <input name="code" inputmode="numeric" maxlength="7" autocomplete="one-time-code" required autofocus class="otp"></label>
+  {{template "ferr" dict "Errors" .Errors "Field" "code"}}
+  <button class="btn btn-primary btn-block" type="submit">验证 {{template "spinner"}}</button>
+  <p class="small"><a href="/login">换一个账号</a></p>
+</form>
+{{end}}

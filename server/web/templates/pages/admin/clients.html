@@ -1,0 +1,42 @@
+{{define "content"}}
+<div class="page-head row spread">
+  <h1>应用</h1>
+  <a class="btn btn-primary" href="/clients/new">创建应用</a>
+</div>
+<form class="toolbar" method="get" action="/clients" hx-get="/clients" hx-target="#clients-table" hx-swap="outerHTML" hx-trigger="input changed delay:300ms from:input, change from:select, submit" hx-push-url="true">
+  <input type="search" name="q" value="{{.Form.q}}" placeholder="名称 / Client ID" aria-label="搜索">
+  <select name="status" aria-label="状态">
+    <option value="">全部状态</option>
+    <option value="2" {{if eq .Form.status "2"}}selected{{end}}>待审核</option>
+    <option value="1" {{if eq .Form.status "1"}}selected{{end}}>已启用</option>
+    <option value="3" {{if eq .Form.status "3"}}selected{{end}}>已停用</option>
+  </select>
+</form>
+<section class="card">{{template "clients_table" .}}</section>
+{{end}}
+
+{{define "clients_table"}}
+<div id="clients-table">
+  <p class="small muted">共 {{.Data.Total}} 个应用</p>
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>名称</th><th>Client ID</th><th>类型</th><th>标记</th><th>状态</th><th>Webhook</th><th>创建时间</th></tr></thead>
+    <tbody>
+    {{range .Data.Clients}}
+      <tr>
+        <td><a href="/clients/{{.ID}}"><strong>{{.Name}}</strong></a></td>
+        <td class="mono small">{{.ID}}</td>
+        <td class="small">{{if eq .ApplicationType "native"}}原生{{else if .IsPublic}}SPA{{else}}机密{{end}}</td>
+        <td>{{if .FirstParty}}<span class="badge badge-primary">第一方</span>{{end}}{{if .NativeLogin}} <span class="badge">原生登录</span>{{end}}{{if .Verified}} <span class="badge badge-ok">已验证</span>{{end}}{{if eq .RequireAMR "otp"}} <span class="badge">需 2FA</span>{{end}}</td>
+        <td>{{template "client_status" .Status}}</td>
+        <td class="small">{{if .WebhookURL}}{{if .WebhookDisabledAt}}<span class="badge badge-err">停用</span>{{else if .WebhookLastError}}<span class="badge badge-warn">重试中</span>{{else}}<span class="badge badge-ok">正常</span>{{end}}{{else}}—{{end}}</td>
+        <td class="small nowrap">{{fmtTime .CreatedAt}}</td>
+      </tr>
+    {{else}}
+      <tr><td colspan="7" class="muted">没有应用</td></tr>
+    {{end}}
+    </tbody>
+  </table>
+  </div>
+</div>
+{{end}}

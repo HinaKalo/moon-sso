@@ -1,0 +1,35 @@
+{{define "content"}}
+<div class="page-head">
+  <h1>授权应用</h1>
+  <p class="muted">这些应用可以使用你的账号登录。取消授权后，应用会立即失去访问权限并收到通知。</p>
+</div>
+<section class="card">{{template "apps_list" .}}</section>
+{{end}}
+
+{{define "apps_list"}}
+<div id="apps-list">
+  {{if .Flash}}<div class="alert alert-ok" role="status">{{.Flash}}</div>{{end}}
+  <ul class="list">
+  {{$csrf := .CSRF}}
+  {{range .Data.Grants}}
+    <li class="list-item">
+      <div class="row">
+        {{if .ClientLogo}}<img class="app-logo" src="{{.ClientLogo}}" alt="" referrerpolicy="no-referrer">{{else}}<span class="app-logo avatar avatar-fallback">{{initial .ClientName}}</span>{{end}}
+        <div>
+          <div><strong>{{.ClientName}}</strong> {{if .FirstParty}}<span class="badge badge-primary">官方</span>{{else if .Verified}}<span class="badge badge-ok">已验证</span>{{else}}<span class="badge badge-warn">未验证</span>{{end}}</div>
+          <div class="small muted">授权于 {{fmtTime .CreatedAt}}{{with .LastUsedAt}} · 最近使用 {{ago .}}{{end}}</div>
+          {{if .Scopes}}<div class="small muted">权限：{{join .Scopes "、"}}</div>{{end}}
+        </div>
+      </div>
+      <form method="post" action="/account/apps/revoke" hx-post="/account/apps/revoke" hx-target="#apps-list" hx-swap="outerHTML" hx-confirm="确定取消对「{{.ClientName}}」的授权吗？">
+        <input type="hidden" name="_csrf" value="{{$csrf}}">
+        <input type="hidden" name="client_id" value="{{.ClientID}}">
+        <button class="btn btn-ghost btn-sm" type="submit">取消授权</button>
+      </form>
+    </li>
+  {{else}}
+    <li class="muted">还没有授权任何应用。</li>
+  {{end}}
+  </ul>
+</div>
+{{end}}

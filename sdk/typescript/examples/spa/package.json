@@ -1,0 +1,17 @@
+{
+  "name": "moon-sso-example-spa",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Minimal browser SPA using @moon-sso/browser (no bundler: ES modules + import map)",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@moon-sso/browser": "file:../../packages/browser"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.0"
+  }
+}

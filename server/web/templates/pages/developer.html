@@ -1,0 +1,137 @@
+{{define "content"}}
+<div class="page-head row spread">
+  <div>
+    <h1>开发者中心</h1>
+    <p class="muted">把你的应用接入 {{.Site.SiteName}}，让用户用同一个账号登录。</p>
+  </div>
+  {{if ne .Site.ClientRegistration "closed"}}<a class="btn btn-primary" href="/developer/apps/new">创建应用</a>{{end}}
+</div>
+{{if eq .Site.ClientRegistration "closed"}}<div class="alert alert-err">管理员目前关闭了应用自助注册，请联系管理员创建应用。</div>{{end}}
+{{if eq .Site.ClientRegistration "approval"}}<p class="small muted">新创建的应用需要管理员审核后才能使用。</p>{{end}}
+<section class="card">
+  <h2>我的应用</h2>
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>名称</th><th>Client ID</th><th>类型</th><th>状态</th><th>创建时间</th></tr></thead>
+    <tbody>
+    {{range .Data.Apps}}
+      <tr>
+        <td><a href="/developer/apps/{{.ID}}">{{.Name}}</a></td>
+        <td class="mono small">{{.ID}}</td>
+        <td>{{if eq .ApplicationType "native"}}原生应用{{else if .IsPublic}}单页应用{{else}}Web / 服务{{end}}</td>
+        <td>{{if eq .Status 1}}<span class="badge badge-ok">已启用</span>{{else if eq .Status 2}}<span class="badge badge-warn">待审核</span>{{else}}<span class="badge badge-err">已停用</span>{{end}}</td>
+        <td class="small">{{fmtTime .CreatedAt}}</td>
+      </tr>
+    {{else}}
+      <tr><td colspan="5" class="muted">还没有应用。</td></tr>
+    {{end}}
+    </tbody>
+  </table>
+  </div>
+</section>
+{{template "api_tokens" .}}
+<section class="card">
+  <h2>通过 API / SDK 注册应用</h2>
+  <p>各平台 SDK 和 <code class="mono">POST /oauth/register</code>（RFC 7591 动态注册）需要一次性的 Initial Access Token，有效期 24 小时。</p>
+  {{template "token_box" .}}
+</section>
+{{end}}
+
+{{define "token_box"}}
+<div id="token-box">
+  {{with .Data.Token}}
+  <p class="small">只显示这一次，请立即复制：</p>
+  <div class="secret-once"><span id="iat">{{.}}</span><button class="btn btn-ghost btn-sm" type="button" data-copy="iat">复制</button></div>
+  <pre class="mono small code-block">curl -X POST {{$.Data.Issuer}}/oauth/register \
+  -H "Authorization: Bearer {{.}}" \
+  -H "Content-Type: application/json" \
+  -d '{"client_name":"My App","redirect_uris":["https://myapp.example/callback"]}'</pre>
+  {{else}}
+  <form method="post" action="/developer/tokens" hx-post="/developer/tokens" hx-target="#token-box" hx-swap="outerHTML">
+    {{template "csrf" .}}
+    <button class="btn btn-ghost" type="submit">生成 Initial Access Token</button>
+  </form>
+  {{end}}
+</div>
+{{end}}
+
+{{define "api_tokens"}}
+<section class="card" id="api-tokens">
+  <div class="row spread">
+    <h2>API 令牌</h2>
+    <a class="small" href="/docs#api-tokens">调用方式与命令行工具 →</a>
+  </div>
+  <p class="muted small">用于终端、脚本和 CI 直接管理你的应用：<code class="mono">Authorization: Bearer msso_dev_…</code>，调用 <code class="mono">{{.Data.Issuer}}/api/v1/developer</code>。令牌只在创建时显示一次，服务器只保存它的指纹。</p>
+  {{template "alerts" .}}
+  {{with .Data.NewToken}}
+  <div class="new-token">
+    <p class="small"><strong>新令牌只显示这一次</strong>，请立即复制并妥善保存：</p>
+    <div class="secret-once"><span id="new-api-token">{{.}}</span><button class="btn btn-ghost btn-sm" type="button" data-copy="new-api-token">复制</button></div>
+    <pre class="mono small code-block"># 命令行工具
+moonsso login --with-token &lt;&lt;&lt; '{{.}}'
+moonsso apps list
+
+# 或直接用 curl
+export MOONSSO_TOKEN='{{.}}'
+curl -H "Authorization: Bearer $MOONSSO_TOKEN" {{$.Data.Issuer}}/api/v1/developer/apps</pre>
+  </div>
+  {{end}}
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>名称</th><th>权限</th><th>状态</th><th>到期</th><th>最近使用</th><th></th></tr></thead>
+    <tbody>
+    {{$csrf := .CSRF}}{{$grace := .Data.GraceChoices}}
+    {{range .Data.APITokens}}
+      <tr>
+        <td><strong>{{.Name}}</strong><br><span class="mono small muted">{{.Hint}}</span>{{if .AllowedIPs}}<br><span class="small muted">仅限 {{join .AllowedIPs ", "}}</span>{{end}}</td>
+        <td>{{range .Scopes}}<span class="badge mono">{{.}}</span> {{end}}</td>
+        <td>{{template "api_token_status" .}}</td>
+        <td class="small nowrap">{{fmtTime .ExpiresAt}}</td>
+        <td class="small">{{if .LastUsedAt}}{{fmtTime .LastUsedAt}}<br><span class="mono muted">{{.LastUsedIP}}</span>{{else}}<span class="muted">从未</span>{{end}}</td>
+        <td>
+          {{if or (eq .Status "active") (eq .Status "rotating")}}
+          <div class="actions">
+            {{if eq .Status "active"}}
+            <form method="post" action="/developer/api-tokens/{{.ID}}/rotate" hx-post="/developer/api-tokens/{{.ID}}/rotate" hx-target="#api-tokens" hx-swap="outerHTML" class="inline-form">
+              <input type="hidden" name="_csrf" value="{{$csrf}}">
+              <select name="grace" aria-label="旧令牌宽限期">{{range $grace}}<option value="{{.Seconds}}" {{if eq .Seconds 3600}}selected{{end}}>旧令牌{{.Label}}{{if ne .Seconds 0}}后失效{{end}}</option>{{end}}</select>
+              <button class="btn btn-ghost btn-sm" type="submit">轮换</button>
+            </form>
+            {{end}}
+            <form method="post" action="/developer/api-tokens/{{.ID}}/revoke" hx-post="/developer/api-tokens/{{.ID}}/revoke" hx-target="#api-tokens" hx-swap="outerHTML" hx-confirm="吊销后使用该令牌的请求会立即失败，确定吗？">
+              <input type="hidden" name="_csrf" value="{{$csrf}}">
+              <button class="btn btn-danger btn-sm" type="submit">吊销</button>
+            </form>
+          </div>
+          {{end}}
+        </td>
+      </tr>
+    {{else}}
+      <tr><td colspan="6" class="muted">还没有 API 令牌。</td></tr>
+    {{end}}
+    </tbody>
+  </table>
+  </div>
+  <details class="gap-top" {{if .Error}}open{{end}}>
+    <summary class="btn btn-primary">创建 API 令牌</summary>
+    <form method="post" action="/developer/api-tokens" hx-post="/developer/api-tokens" hx-target="#api-tokens" hx-swap="outerHTML" class="form gap-top narrow-left">
+      {{template "csrf" .}}
+      <label class="field"><span>名称</span><input name="name" value="{{.Form.name}}" required maxlength="64" placeholder="例如：CI 部署、笔记本终端"></label>
+      {{template "ferr" dict "Errors" .Errors "Field" "name"}}
+      <fieldset class="field"><legend>权限</legend>
+        {{$sel := .Data.SelectedTokenScopes}}
+        {{range .Data.TokenScopes}}<label class="check"><input type="checkbox" name="scopes" value="{{.Name}}" {{if has $sel .Name}}checked{{end}}><span><code class="mono">{{.Name}}</code> — {{.Label}}</span></label>{{end}}
+        <p class="small muted">write 权限包含对应的 read 权限。</p>
+      </fieldset>
+      {{template "ferr" dict "Errors" .Errors "Field" "scopes"}}
+      <label class="field"><span>有效期</span>
+        <select name="days">{{$d := .Form.days}}{{range .Data.TokenLifetimes}}<option value="{{.}}" {{if eq (printf "%d" .) $d}}selected{{end}}>{{.}} 天</option>{{end}}</select>
+      </label>
+      {{template "ferr" dict "Errors" .Errors "Field" "expires_in_days"}}
+      <label class="field"><span>IP 白名单 <em>可选</em></span><input name="allowed_ips" value="{{.Form.allowed_ips}}" placeholder="203.0.113.7, 198.51.100.0/24, 2001:db8::/48" spellcheck="false"></label>
+      {{template "ferr" dict "Errors" .Errors "Field" "allowed_ips"}}
+      <button class="btn btn-primary" type="submit">创建</button>
+    </form>
+  </details>
+</section>
+{{end}}

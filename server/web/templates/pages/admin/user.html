@@ -1,0 +1,70 @@
+{{define "content"}}
+{{$u := .Data.Target}}
+<div class="page-head">
+  <p class="small"><a href="/users">← 用户</a></p>
+  <div class="row">
+    {{template "avatar" dict "User" $u "Size" "md"}}
+    <div>
+      <h1>{{$u.Username}} {{template "status_badge" $u.Status}}</h1>
+      <p class="muted small">{{$u.DisplayName}} · <span class="mono">{{$u.PublicSub}}</span></p>
+    </div>
+  </div>
+</div>
+{{template "alerts" .}}
+{{with .Data.TempPassword}}<div class="secret-once"><span id="tmp-pw">{{.}}</span><button class="btn btn-ghost btn-sm" type="button" data-copy="tmp-pw">复制</button></div>{{end}}
+<div class="grid-2 gap-top">
+  <section class="card">
+    <h2>资料</h2>
+    <dl class="kv">
+      <dt>注册时间</dt><dd>{{fmtTime $u.CreatedAt}}</dd>
+      <dt>注册来源</dt><dd class="mono small">{{$u.RegisteredVia}}</dd>
+      <dt>资料版本</dt><dd>v{{$u.ProfileVersion}}（更新于 {{fmtTime $u.UpdatedAt}}）</dd>
+      <dt>密码修改</dt><dd>{{fmtTime $u.PasswordChangedAt}}{{if $u.MustChangePassword}} <span class="badge badge-warn">需修改</span>{{end}}</dd>
+      <dt>两步验证</dt><dd>{{if $u.HasTOTP}}<span class="badge badge-ok">已开启</span>{{else}}未开启{{end}}</dd>
+    </dl>
+  </section>
+  <section class="card">
+    <h2>操作</h2>
+    <div class="actions">
+      {{$csrf := .CSRF}}{{$sub := $u.PublicSub}}
+      {{if eq $u.Status 1}}
+        <form method="post" action="/users/{{$sub}}" hx-confirm="停用后该用户在所有应用中立即退出，确定吗？"><input type="hidden" name="_csrf" value="{{$csrf}}"><button class="btn btn-ghost btn-sm" name="action" value="disable">停用账号</button></form>
+      {{else}}
+        <form method="post" action="/users/{{$sub}}"><input type="hidden" name="_csrf" value="{{$csrf}}"><button class="btn btn-primary btn-sm" name="action" value="enable">启用账号</button></form>
+      {{end}}
+      <form method="post" action="/users/{{$sub}}" hx-confirm="将生成临时密码并让该用户所有设备退出，确定吗？"><input type="hidden" name="_csrf" value="{{$csrf}}"><button class="btn btn-ghost btn-sm" name="action" value="reset_password">重置密码</button></form>
+      <form method="post" action="/users/{{$sub}}"><input type="hidden" name="_csrf" value="{{$csrf}}"><button class="btn btn-ghost btn-sm" name="action" value="revoke_sessions">全部设备退出</button></form>
+      {{if $u.HasTOTP}}<form method="post" action="/users/{{$sub}}" hx-confirm="确定关闭该用户的两步验证吗？"><input type="hidden" name="_csrf" value="{{$csrf}}"><button class="btn btn-ghost btn-sm" name="action" value="disable_totp">关闭两步验证</button></form>{{end}}
+    </div>
+    <details class="gap-top">
+      <summary class="small">删除账号</summary>
+      <form method="post" action="/users/{{$sub}}" class="form gap-top">
+        <input type="hidden" name="_csrf" value="{{$csrf}}">
+        <p class="small">删除不可恢复，接入应用会收到 user.deleted 事件。输入用户名 <strong>{{$u.Username}}</strong> 确认：</p>
+        <input name="confirm" autocomplete="off" required>
+        <button class="btn btn-danger btn-sm" name="action" value="delete">永久删除</button>
+      </form>
+    </details>
+  </section>
+</div>
+<section class="card">
+  <h2>登录设备（{{len .Data.Sessions}}）</h2>
+  <ul class="list">
+  {{range .Data.Sessions}}
+    <li class="list-item"><div><strong>{{.UserAgent | uaSummary}}</strong><div class="small muted">{{.IP}} · 登录于 {{fmtTime .CreatedAt}} · 最近活动 {{ago .LastSeenAt}}{{if contains .AMR "otp"}} · 两步验证{{end}}</div></div></li>
+  {{else}}<li class="muted">没有活跃会话</li>{{end}}
+  </ul>
+</section>
+<section class="card">
+  <h2>授权应用（{{len .Data.Grants}}）</h2>
+  <ul class="list">
+  {{range .Data.Grants}}
+    <li class="list-item"><div><a href="/clients/{{.ClientID}}"><strong>{{.ClientName}}</strong></a> <span class="mono small muted">sub {{.Sub}}</span><div class="small muted">授权于 {{fmtTime .CreatedAt}}{{with .LastUsedAt}} · 最近使用 {{ago .}}{{end}} · {{join .ConsentedScopes " "}}</div></div></li>
+  {{else}}<li class="muted">没有授权应用</li>{{end}}
+  </ul>
+</section>
+<section class="card">
+  <h2>相关记录</h2>
+  {{template "audit_rows" .Data.Activity}}
+</section>
+{{end}}

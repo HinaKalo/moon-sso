@@ -1,0 +1,30 @@
+{{define "content"}}
+<div class="page-head row spread">
+  <div>
+    <h1>签名密钥</h1>
+    <p class="muted">新密钥先在 JWKS 中发布 24 小时，之后才开始签发令牌；旧密钥在退役后继续发布 48 小时，保证已签发的令牌都能验证。</p>
+  </div>
+  <form method="post" action="/keys/rotate" hx-post="/keys/rotate" hx-confirm="发布一组新的签名密钥（RS256 + ES256），24 小时后启用。确定吗？">
+    {{template "csrf" .}}
+    <button class="btn btn-primary" type="submit">轮换密钥</button>
+  </form>
+</div>
+<section class="card">
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>kid</th><th>算法</th><th>状态</th><th>启用时间</th><th>退役时间</th></tr></thead>
+    <tbody>
+    {{range .Data.Keys}}
+      <tr>
+        <td class="mono small">{{.KID}}</td>
+        <td>{{.Alg}}</td>
+        <td>{{if eq .State 1}}<span class="badge badge-warn">已发布，待启用</span>{{else if eq .State 2}}<span class="badge badge-ok">使用中</span>{{else}}<span class="badge">已退役</span>{{end}}</td>
+        <td class="small">{{fmtTime .Activate}}</td>
+        <td class="small">{{fmtTime .Retired}}</td>
+      </tr>
+    {{end}}
+    </tbody>
+  </table>
+  </div>
+</section>
+{{end}}

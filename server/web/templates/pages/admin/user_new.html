@@ -1,0 +1,20 @@
+{{define "content"}}
+<div class="page-head">
+  <p class="small"><a href="/users">← 用户</a></p>
+  <h1>创建用户</h1>
+  <p class="muted">这里创建的是 SSO 用户（不是控制台管理员），不受“开放自助注册”开关限制，首次登录必须修改密码。</p>
+</div>
+<section class="card narrow-left">
+  <form method="post" action="/users/new" class="form">
+    {{template "csrf" .}}
+    {{template "alerts" .}}
+    <label class="field"><span>用户名</span><input name="username" value="{{.Form.username}}" required minlength="3" maxlength="32" autocapitalize="none" spellcheck="false"></label>
+    {{template "ferr" dict "Errors" .Errors "Field" "username"}}
+    <label class="field"><span>昵称 <em>可选</em></span><input name="display_name" value="{{.Form.display_name}}" maxlength="32"></label>
+    {{template "ferr" dict "Errors" .Errors "Field" "display_name"}}
+    <label class="field"><span>初始密码 <em>留空自动生成</em></span><input name="password" type="text" autocomplete="off" maxlength="128"></label>
+    {{template "ferr" dict "Errors" .Errors "Field" "password"}}
+    <button class="btn btn-primary" type="submit">创建</button>
+  </form>
+</section>
+{{end}}

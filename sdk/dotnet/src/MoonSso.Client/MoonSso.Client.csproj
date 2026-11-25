@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFrameworks>net8.0;net10.0</TargetFrameworks>
+    <RootNamespace>MoonSso</RootNamespace>
+    <AssemblyName>MoonSso.Client</AssemblyName>
+    <PackageId>MoonSso.Client</PackageId>
+    <Description>Moon SSO OAuth 2.x / OpenID Connect client: discovery, PKCE, DPoP, silent token refresh (single-flight, cross-process aware), first-party login with OTP, native registration, account API, profile events (SSE), ID token / JWKS verification, Standard Webhooks and back-channel logout verification.</Description>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <NoWarn>$(NoWarn);CS1591;CS1573</NoWarn>
+    <IsPackable>true</IsPackable>
+  </PropertyGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="MoonSso.Desktop" />
+    <InternalsVisibleTo Include="MoonSso.Tests" />
+    <None Include="..\..\README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
+</Project>

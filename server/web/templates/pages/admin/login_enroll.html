@@ -1,0 +1,13 @@
+{{define "auth_form"}}
+<form method="post" action="/login/enroll" hx-post="/login/enroll" hx-target="this" hx-swap="outerHTML" hx-disabled-elt="find button" class="form">
+  {{template "csrf" .}}
+  {{template "alerts" .}}
+  <p>控制台必须使用两步验证。请用身份验证器 App 扫描二维码：</p>
+  <div class="qr"><img src="{{.Data.QR}}" alt="身份验证器二维码" width="180" height="180"></div>
+  <p class="small muted">无法扫码？手动输入密钥：<code class="mono">{{.Data.Secret}}</code></p>
+  <label class="field"><span>App 上显示的 6 位验证码</span>
+    <input name="code" inputmode="numeric" maxlength="7" autocomplete="one-time-code" required autofocus class="otp"></label>
+  {{template "ferr" dict "Errors" .Errors "Field" "code"}}
+  <button class="btn btn-primary btn-block" type="submit">绑定并进入控制台 {{template "spinner"}}</button>
+</form>
+{{end}}

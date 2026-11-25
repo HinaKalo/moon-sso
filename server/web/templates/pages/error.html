@@ -1,0 +1,10 @@
+{{define "content"}}
+<section class="card {{if .User}}narrow{{else}}auth-card{{end}}">
+  <h1>{{.Data.Heading}}</h1>
+  <p>{{.Data.Message}}</p>
+  {{with .Data.Detail}}<p class="muted mono small">{{.}}</p>{{end}}
+  <p><a class="btn btn-ghost" href="/">返回首页</a></p>
+</section>
+{{end}}
+
+{{define "error_fragment"}}<div class="alert alert-err" role="alert">{{.Data.Message}}</div>{{end}}

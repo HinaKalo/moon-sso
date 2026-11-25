@@ -1,0 +1,11 @@
+{{define "content"}}
+<section class="card auth-card">
+  <h1>正在返回应用…</h1>
+  <form id="form-post" method="post" action="{{.Data.Action}}">
+    {{range $k, $v := .Data.Fields}}<input type="hidden" name="{{$k}}" value="{{$v}}">{{end}}
+    <noscript><p>浏览器未启用脚本，请点击继续。</p></noscript>
+    <button class="btn btn-primary btn-block" type="submit">继续</button>
+  </form>
+  <script src="{{asset "form_post.js"}}"></script>
+</section>
+{{end}}

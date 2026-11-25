@@ -1,0 +1,323 @@
+openapi: 3.1.0
+info:
+  title: Moon SSO Console API
+  version: "1.0"
+  description: |
+    Super-administrator API of Moon SSO, served only by the console host.
+
+    * Authenticate with a console API token: `Authorization: Bearer msso_adm_…`.
+      Tokens are issued on the console's "API 令牌" page (a fresh TOTP code is
+      required), carry scopes, expire after at most 90 days and can be limited
+      to IP ranges. Developer tokens (`msso_dev_…`) are rejected here.
+    * Every action is audited as the owning administrator, tagged `token:…`.
+    * Responses carry `Moon-Token-Expires-At`; a rotated token still inside its
+      grace period also gets `Moon-Token-Rotated: true`.
+    * Errors use `{"error": "...", "error_description": "...", "field": "..."}`;
+      429 and 503 carry `Retry-After`.
+    * Scopes: stats:read, users:read, users:write, clients:read, clients:write,
+      settings:read, settings:write, audit:read (write implies read).
+servers:
+  - url: https://sso-admin.moonl.cloud
+tags:
+  - name: console
+paths:
+  /api/v1/token:
+    get:
+      tags: [console]
+      summary: Describe the calling console token
+      security: [{consoleToken: []}]
+      responses: {"200": {description: "{token, admin: {username}, api}"}, "401": {$ref: "#/components/responses/TokenError"}}
+    delete:
+      tags: [console]
+      summary: Revoke the calling console token
+      security: [{consoleToken: []}]
+      responses: {"204": {description: Revoked}}
+  /api/v1/token/rotate:
+    post:
+      tags: [console]
+      summary: Rotate the calling console token
+      security: [{consoleToken: []}]
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/RotateRequest"}
+      responses: {"201": {description: New token (shown once), content: {application/json: {schema: {$ref: "#/components/schemas/IssuedAPIToken"}}}}}
+  /api/v1/stats:
+    get:
+      tags: [console]
+      summary: Dashboard counters (stats:read)
+      security: [{consoleToken: []}]
+      responses: {"200": {description: "users_total, users_disabled, users_new_24h, logins_24h, active_sessions, active_refresh_families, clients_total, clients_pending, webhooks_failing, dead_letters, sse_connections, registration_open, client_registration"}}
+  /api/v1/users:
+    get:
+      tags: [console]
+      summary: Search SSO users (users:read)
+      security: [{consoleToken: []}]
+      parameters:
+        - {name: q, in: query, schema: {type: string}}
+        - {name: status, in: query, schema: {type: string, enum: [active, disabled]}}
+        - {name: page, in: query, schema: {type: integer, minimum: 1}}
+        - {name: per_page, in: query, schema: {type: integer, minimum: 1, maximum: 200}}
+      responses: {"200": {description: "{users: [ConsoleUser], total, page, per_page, has_next}"}}
+    post:
+      tags: [console]
+      summary: Create an SSO user (users:write)
+      description: Without a password a temporary one is generated and returned once as temporary_password. The user must change it at first login.
+      security: [{consoleToken: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {type: object, required: [username], properties: {username: {type: string}, display_name: {type: string}, password: {type: string}}}
+      responses: {"201": {description: ConsoleUser (+ temporary_password)}, "422": {$ref: "#/components/responses/ValidationError"}}
+  /api/v1/users/{user}:
+    parameters:
+      - {name: user, in: path, required: true, description: public sub or username, schema: {type: string}}
+    get:
+      tags: [console]
+      summary: User with sessions and grants (users:read)
+      security: [{consoleToken: []}]
+      responses: {"200": {description: ConsoleUser + sessions + grants}, "404": {description: Not found}}
+    delete:
+      tags: [console]
+      summary: Delete an SSO user (users:write)
+      security: [{consoleToken: []}]
+      parameters: [{name: confirm, in: query, required: true, description: must equal the username, schema: {type: string}}]
+      responses: {"204": {description: Deleted}, "400": {description: confirmation_required}}
+  /api/v1/users/{user}/{action}:
+    post:
+      tags: [console]
+      summary: User action (users:write)
+      security: [{consoleToken: []}]
+      parameters:
+        - {name: user, in: path, required: true, schema: {type: string}}
+        - {name: action, in: path, required: true, schema: {type: string, enum: [disable, enable, reset-password, disable-totp, revoke-sessions]}}
+      responses: {"200": {description: ConsoleUser (reset-password adds temporary_password)}}
+  /api/v1/clients:
+    get:
+      tags: [console]
+      summary: List all apps (clients:read)
+      security: [{consoleToken: []}]
+      parameters:
+        - {name: q, in: query, schema: {type: string}}
+        - {name: status, in: query, schema: {type: string, enum: [active, pending, disabled]}}
+      responses: {"200": {description: "{clients: [ConsoleApp], total}"}}
+    post:
+      tags: [console]
+      summary: Create an app with administrator flags (clients:write)
+      security: [{consoleToken: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/ConsoleAppMetadata"}
+      responses: {"201": {description: ConsoleApp with one-time secrets}, "422": {$ref: "#/components/responses/ValidationError"}}
+  /api/v1/clients/{client_id}:
+    parameters:
+      - {name: client_id, in: path, required: true, schema: {type: string}}
+    get:
+      tags: [console]
+      summary: Get an app (clients:read)
+      security: [{consoleToken: []}]
+      responses: {"200": {description: ConsoleApp + grant_count}}
+    patch:
+      tags: [console]
+      summary: Update metadata and flags (clients:write)
+      security: [{consoleToken: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/ConsoleAppMetadata"}
+      responses: {"200": {description: ConsoleApp}}
+    delete:
+      tags: [console]
+      summary: Delete an app (clients:write)
+      security: [{consoleToken: []}]
+      parameters: [{name: confirm, in: query, required: true, description: must equal the client_id, schema: {type: string}}]
+      responses: {"204": {description: Deleted}}
+  /api/v1/clients/{client_id}/{action}:
+    post:
+      tags: [console]
+      summary: App action (clients:write)
+      security: [{consoleToken: []}]
+      parameters:
+        - {name: client_id, in: path, required: true, schema: {type: string}}
+        - {name: action, in: path, required: true, schema: {type: string, enum: [approve, enable, disable, rotate-secret, rotate-webhook-secret, webhook-test, webhook-enable]}}
+      responses: {"200": {description: ConsoleApp (rotate actions add client_secret or webhook_secret; webhook-test returns {delivered, error})}}
+  /api/v1/webhooks/dead-letters:
+    get:
+      tags: [console]
+      summary: Unresolved webhook dead letters (clients:read)
+      security: [{consoleToken: []}]
+      parameters: [{name: client_id, in: query, schema: {type: string}}]
+      responses: {"200": {description: "{dead_letters: [{id, client_id, seq, attempts, last_error, created_at}]}"}}
+  /api/v1/webhooks/dead-letters/{id}/redrive:
+    post:
+      tags: [console]
+      summary: Redeliver a dead letter (clients:write)
+      security: [{consoleToken: []}]
+      parameters: [{name: id, in: path, required: true, schema: {type: integer}}]
+      responses: {"200": {description: "{redriven: true}"}}
+  /api/v1/settings:
+    get:
+      tags: [console]
+      summary: System settings (settings:read)
+      security: [{consoleToken: []}]
+      responses: {"200": {description: Settings, content: {application/json: {schema: {$ref: "#/components/schemas/Settings"}}}}}
+    patch:
+      tags: [console]
+      summary: Change any subset of settings (settings:write)
+      security: [{consoleToken: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/Settings"}
+      responses: {"200": {description: Settings after the change}, "422": {$ref: "#/components/responses/ValidationError"}}
+  /api/v1/audit:
+    get:
+      tags: [console]
+      summary: Audit log, newest first (audit:read)
+      security: [{consoleToken: []}]
+      parameters:
+        - {name: action, in: query, schema: {type: string}}
+        - {name: target, in: query, schema: {type: string}}
+        - {name: actor, in: query, description: SSO username, or @name for a console administrator, schema: {type: string}}
+        - {name: before, in: query, description: next_before from the previous page, schema: {type: integer}}
+        - {name: limit, in: query, schema: {type: integer, maximum: 500}}
+      responses: {"200": {description: "{entries: [{id, at, action, target_type, target_id, ip, meta, actor_admin, actor_client, actor_user_id}], next_before}"}}
+components:
+  securitySchemes:
+    consoleToken: {type: http, scheme: bearer, description: "Console API token (msso_adm_…)"}
+  responses:
+    TokenError:
+      description: "invalid_token: missing, unknown, expired or revoked token, or a developer token"
+      content:
+        application/json:
+          schema: {$ref: "#/components/schemas/Error"}
+    ScopeError:
+      description: "insufficient_scope or ip_not_allowed"
+      content:
+        application/json:
+          schema: {$ref: "#/components/schemas/Error"}
+    ValidationError:
+      description: Validation failed
+      content:
+        application/json:
+          schema: {$ref: "#/components/schemas/Error"}
+  schemas:
+    Error:
+      type: object
+      properties:
+        error: {type: string}
+        error_description: {type: string}
+        field: {type: string}
+    ClientMetadata:
+      type: object
+      required: [client_name, redirect_uris]
+      properties:
+        client_name: {type: string}
+        redirect_uris: {type: array, items: {type: string}}
+        post_logout_redirect_uris: {type: array, items: {type: string}}
+        grant_types: {type: array, items: {type: string}}
+        token_endpoint_auth_method: {type: string, enum: [client_secret_basic, client_secret_post, none]}
+        application_type: {type: string, enum: [web, native]}
+        scope: {type: string}
+        id_token_signed_response_alg: {type: string, enum: [RS256, ES256]}
+        backchannel_logout_uri: {type: string}
+        dpop_bound_access_tokens: {type: boolean}
+        webhook_url: {type: string}
+        webhook_events: {type: array, items: {type: string}}
+        logo_uri: {type: string}
+        client_uri: {type: string}
+        policy_uri: {type: string}
+        tos_uri: {type: string}
+    ClientInformation:
+      allOf:
+        - $ref: "#/components/schemas/ClientMetadata"
+        - type: object
+          properties:
+            client_id: {type: string}
+            client_secret: {type: string}
+            registration_access_token: {type: string}
+            registration_client_uri: {type: string}
+            webhook_secret: {type: string}
+            status: {type: string, enum: [active, pending_approval, disabled]}
+    APIToken:
+      type: object
+      properties:
+        id: {type: string, format: uuid}
+        kind: {type: string, enum: [developer, console]}
+        name: {type: string}
+        owner: {type: string}
+        hint: {type: string, example: "msso_dev_AbCd…wxyz"}
+        scopes: {type: array, items: {type: string}}
+        allowed_ips: {type: array, items: {type: string}}
+        status: {type: string, enum: [active, rotating, expired, revoked]}
+        expires_soon: {type: boolean}
+        created_at: {type: string, format: date-time}
+        expires_at: {type: string, format: date-time}
+        last_used_at: {type: [string, "null"], format: date-time}
+        last_used_ip: {type: string}
+        revoked_at: {type: string, format: date-time}
+        rotated_from: {type: string}
+        replaced_by: {type: string}
+    IssuedAPIToken:
+      allOf:
+        - $ref: "#/components/schemas/APIToken"
+        - type: object
+          properties:
+            token: {type: string, description: The secret. Shown only in this response.}
+    RotateRequest:
+      type: object
+      properties:
+        grace_seconds: {type: integer, minimum: 0, maximum: 604800, default: 3600}
+    AppMetadata:
+      allOf:
+        - $ref: "#/components/schemas/ClientMetadata"
+        - type: object
+          properties:
+            description: {type: string}
+            require_dpop: {type: boolean, description: Require DPoP-bound refresh tokens (alias of dpop_bound_access_tokens on input)}
+    App:
+      allOf:
+        - $ref: "#/components/schemas/ClientInformation"
+        - type: object
+          properties:
+            created_at: {type: string, format: date-time}
+            updated_at: {type: string, format: date-time}
+            verified: {type: boolean}
+            has_client_secret: {type: boolean}
+            client_secret_rotated_at: {type: string, format: date-time}
+            subject_type: {type: string, enum: [public, pairwise]}
+            webhook_state: {type: object}
+    ConsoleAppMetadata:
+      allOf:
+        - $ref: "#/components/schemas/AppMetadata"
+        - type: object
+          properties:
+            first_party: {type: boolean}
+            native_login: {type: boolean}
+            skip_consent: {type: boolean}
+            allow_registration: {type: boolean}
+            verified: {type: boolean}
+            require_otp: {type: boolean}
+            subject_type: {type: string, enum: [public, pairwise]}
+            webhook_allow_insecure: {type: boolean}
+            access_token_ttl_seconds: {type: [integer, "null"], minimum: 60, maximum: 3600}
+    Settings:
+      type: object
+      properties:
+        site_name: {type: string}
+        registration_open: {type: boolean}
+        client_registration: {type: string, enum: [closed, approval, open]}
+        password_min_length: {type: integer}
+        username_cooldown_days: {type: integer}
+        username_reserve_days: {type: integer}
+        session_idle_days: {type: integer}
+        access_token_minutes: {type: integer}
+        refresh_idle_days: {type: integer}
+        refresh_absolute_days: {type: integer}
+        max_clients_per_developer: {type: integer}

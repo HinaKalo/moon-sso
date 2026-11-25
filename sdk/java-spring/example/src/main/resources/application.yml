@@ -1,0 +1,25 @@
+# Moon SSO example. Defaults target the local testbed's "test-web" client
+# (redirect URI http://127.0.0.1:18700/callback). Provide the secret through the
+# environment: MOON_SSO_CLIENT_SECRET=... (never commit secrets).
+server:
+  port: ${PORT:18700}
+  address: 127.0.0.1
+
+moon-sso:
+  issuer: ${MOON_SSO_ISSUER:http://127.0.0.1:18601}
+  client-id: ${MOON_SSO_CLIENT_ID:test-web}
+  client-secret: ${MOON_SSO_CLIENT_SECRET:}
+  scopes: openid,profile,offline_access,profile:write
+  redirect-uri: ${MOON_SSO_REDIRECT_URI:http://127.0.0.1:18700/callback}
+  post-logout-redirect-uri: ${MOON_SSO_POST_LOGOUT_REDIRECT_URI:http://127.0.0.1:18700/}
+  login:
+    processing-url: /callback
+  webhook:
+    # whsec_... shown when the webhook URL was configured; leave empty to disable the endpoint
+    secret: ${MOON_SSO_WEBHOOK_SECRET:}
+
+spring:
+  servlet:
+    multipart:
+      max-file-size: 5MB
+      max-request-size: 6MB
